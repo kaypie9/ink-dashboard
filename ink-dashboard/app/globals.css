@@ -1,0 +1,468 @@
+/* app/globals.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+  background: #f3f4f6;
+  color: #0f172a;
+}
+
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* header */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  height: 56px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  height: 56px;
+  transition: margin-left 0.2s ease;
+}
+
+/* header when sidebar is thin (floating) */
+.header-floating {
+  margin-left: 64px;   /* same as main-floating */
+}
+
+/* header when sidebar is pinned open */
+.header-pinned {
+  margin-left: 220px;  /* same as main-pinned */
+}
+
+
+.header-left {
+  width: 160px;         /* fixed box */
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;   /* keep text in one line */
+  overflow: hidden;      /* hide overflow */
+}
+
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+}
+
+.header-center input {
+  width: 380px;
+  max-width: 380px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.header-center input::placeholder {
+  color: #9ca3af;
+}
+
+.header-right button {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: #111827;
+  color: #f9fafb;
+}
+
+.header-right button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* layout shell */
+
+.layout-shell {
+  position: relative;
+}
+
+/* sidebar base */
+
+.sidebar {
+  background: #ffffff;
+  border-radius: 0;
+  padding: 12px 8px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.sidebar {
+  z-index: 30; /* above header */
+}
+
+.sidebar {
+  /* existing stuff */
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+}
+
+/* collapsed floating sidebar */
+
+.sidebar-floating {
+  width: 64px;
+}
+
+/* expanded on hover */
+
+.sidebar-floating:hover {
+  width: 220px;
+}
+
+/* pinned sidebar */
+
+.sidebar-pinned {
+  width: 220px;
+}
+
+/* pin row */
+
+/* top row with pin (step style: only visible when open) */
+.sidebar-pin-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 10px 8px 10px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+/* show pin when sidebar is expanded (hover) or pinned */
+.sidebar-floating:hover .sidebar-pin-row,
+.sidebar-pinned .sidebar-pin-row {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+
+.sidebar-pin-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  color: #6b7280;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.sidebar-pin-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+/* when sidebar is pinned, make pin button dark (like active) */
+.sidebar-pinned .sidebar-pin-btn {
+  background: #111827;
+  border-color: #111827;
+  color: #f9fafb;
+}
+
+
+/* logo */
+
+
+
+/* nav */
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* brand row like Step (logo at top) */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px 6px 10px;
+  min-height: 40px;
+}
+
+/* small square logo placeholder */
+.sidebar-logo-small {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #6366f1, #22c55e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* when collapsed, center the logo */
+.sidebar-floating .sidebar-brand {
+  justify-content: center;
+}
+
+/* when expanded or pinned, align left like Step */
+.sidebar-floating:hover .sidebar-brand,
+.sidebar-pinned .sidebar-brand {
+  justify-content: flex-start;
+}
+
+
+/* items */
+
+.sidebar-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: #0b1220;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+/* fixed icon column so icons never move */
+
+.sidebar-icon-slot {
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* icon */
+
+.sidebar-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0b1220;
+}
+
+.sidebar-item {
+  color: #9ca3af; /* grey text */
+}
+
+.sidebar-icon {
+  color: #9ca3af; /* grey icon */
+}
+
+.sidebar-item:hover {
+  color: #0b1220; /* dark text */
+}
+
+.sidebar-item:hover .sidebar-icon {
+  color: #0b1220; /* dark icon */
+  filter: brightness(1.4);
+}
+
+.sidebar-item-active {
+  color: #0b1220;            /* dark */
+  font-weight: 600;          /* bold like Step */
+}
+
+.sidebar-item-active .sidebar-icon {
+  color: #0b1220;
+  filter: brightness(1.8);
+}
+
+/* sidebar label style, merged */
+.sidebar-label {
+  white-space: nowrap;
+  text-align: left;
+  display: none;
+
+  /* premium step style */
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-size: 15px;
+  color: #6b7280;
+  transition: color 0.15s ease;
+}
+
+/* show labels only when expanded or pinned */
+.sidebar-floating:hover .sidebar-label,
+.sidebar-pinned .sidebar-label {
+  display: inline-block;
+}
+
+/* hover and active color */
+.sidebar-item:hover .sidebar-label {
+  color: #111827;
+}
+
+.sidebar-item-active .sidebar-label {
+  color: #111827;
+  font-weight: 600;
+}
+
+
+.sidebar-item:hover .sidebar-label {
+  color: #111827;            /* strong dark on hover */
+}
+
+.sidebar-item-active .sidebar-label {
+  color: #111827;
+  font-weight: 600;          /* crisp active weight */
+}
+
+/* premium icon stroke style (Step Finance look) */
+.sidebar-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.75; /* cleaner, sharper icons */
+}
+
+
+/* heroicon svg size locked */
+
+.sidebar-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* vertical accent bar */
+
+.sidebar-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background: transparent;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.sidebar-item:hover::before {
+  background: #9ca3af;
+}
+
+.sidebar-item-active::before {
+  background: #0b1220;
+}
+
+/* hover / active text */
+
+.sidebar-item:hover {
+  color: #0b1220;
+}
+
+.sidebar-item-active {
+  color: #0b1220;
+  font-weight: 600;
+}
+
+
+/* show labels only when expanded or pinned */
+
+.sidebar-floating:hover .sidebar-label,
+.sidebar-pinned .sidebar-label {
+  display: inline-block;
+}
+
+/* collapsed mode: keep icons snug on left */
+
+.sidebar-floating .sidebar-item {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* main content */
+
+.main {
+  min-height: calc(100vh - 56px);
+  padding: 24px;
+  transition: margin-left 0.2s ease;
+}
+
+.main-floating {
+  margin-left: 64px;
+}
+
+.main-pinned {
+  margin-left: 220px;
+}
+
+.main-inner {
+  max-width: 960px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+}
+
