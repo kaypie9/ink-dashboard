@@ -43,32 +43,32 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
+
+  height: 78px;               /* bigger like Step */
+  padding: 16px 32px;         /* more breathing room */
+
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
-  height: 56px;
+
   transition: margin-left 0.2s ease;
 }
 
+
 /* header when sidebar is thin (floating) */
 .header-floating {
-  margin-left: 64px;   /* same as main-floating */
+  margin-left: 80px;   /* same as sidebar-floating */
 }
 
 /* header when sidebar is pinned open */
 .header-pinned {
-  margin-left: 220px;  /* same as main-pinned */
+  margin-left: 260px;  /* same as sidebar-pinned */
 }
 
 
 .header-left {
-  width: 160px;         /* fixed box */
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;   /* keep text in one line */
-  overflow: hidden;      /* hide overflow */
+  width: 180px;              /* more space for title */
+  font-size: 20px;           /* bigger title */
+  font-weight: 600;
 }
 
 
@@ -76,18 +76,13 @@ body {
   flex: 1;
   display: flex;
   justify-content: center;
-  padding: 0 24px;
 }
 
 .header-center input {
-  width: 380px;
-  max-width: 380px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid #d1d5db;
-  font-size: 13px;
-  color: #6b7280;
-  background: #f9fafb;
+  height: 44px;              /* taller search box */
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
 }
 
 .header-center input::placeholder {
@@ -95,14 +90,10 @@ body {
 }
 
 .header-right button {
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: none;
+  height: 44px;              /* taller button */
+  padding: 0 20px;
+  border-radius: 12px;
   font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  background: #111827;
-  color: #f9fafb;
 }
 
 .header-right button:disabled {
@@ -146,34 +137,85 @@ body {
 /* collapsed floating sidebar */
 
 .sidebar-floating {
-  width: 64px;
+  width: 80px;
 }
 
 /* expanded on hover */
 
-.sidebar-floating:hover {
-  width: 220px;
-}
-
-/* pinned sidebar */
-
+.sidebar-floating:hover,
 .sidebar-pinned {
-  width: 220px;
+  width: 260px;
 }
 
 /* pin row */
 
-/* top row with pin (step style: only visible when open) */
-.sidebar-pin-row {
+/* brand row with logo in the middle, pin floated on the right */
+.sidebar-brand {
   display: flex;
-  justify-content: flex-end;
-  padding: 4px 10px 8px 10px;
+  align-items: center;
+  justify-content: center;     /* logo stays centered always */
+  padding: 10px 12px;
+  min-height: 52px;
+  position: relative;          /* so pin can sit on the right */
+}
+
+/* pin button that sits in the top-right corner */
+.pin-in-brand {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+  position: absolute;        /* float in the corner */
+  right: 12px;               /* move away from logo */
+  top: 50%;
+  transform: translateY(-50%);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+/* hide pin when sidebar is collapsed */
+.sidebar-floating .pin-in-brand {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-4px);
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+}
+
+/* show pin when sidebar is hovered or pinned */
+.sidebar-floating:hover .pin-in-brand,
+.sidebar-pinned .pin-in-brand {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+
+/* brand row: logo left, pin right, always same spot */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;   /* logo left, pin right */
+  padding: 12px 12px 8px 12px;
+  min-height: 52px;
+}
+
+
+
+/* pin row inside brand: push it away from logo */
+.sidebar-brand .sidebar-pin-row {
+  margin-left: auto;              /* this pushes the pin to the right */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
 }
 
 /* show pin when sidebar is expanded (hover) or pinned */
@@ -181,8 +223,9 @@ body {
 .sidebar-pinned .sidebar-pin-row {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
 }
+
+
 
 
 .sidebar-pin-btn {
@@ -219,6 +262,10 @@ body {
 
 /* logo */
 
+/* small gap between logo and pin */
+.pin-in-brand {
+  margin-left: 10px;
+}
 
 
 /* nav */
@@ -226,40 +273,27 @@ body {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1px;
+  margin-top: 20px;   /* moves buttons DOWN */
 }
 
-/* brand row like Step (logo at top) */
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  padding: 8px 10px 6px 10px;
-  min-height: 40px;
-}
 
-/* small square logo placeholder */
+
+/* small square logo – always same size */
 .sidebar-logo-small {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   background: linear-gradient(135deg, #6366f1, #22c55e);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+
+  font-size: 14px;
   font-weight: 700;
   color: #ffffff;
-}
 
-/* when collapsed, center the logo */
-.sidebar-floating .sidebar-brand {
-  justify-content: center;
-}
-
-/* when expanded or pinned, align left like Step */
-.sidebar-floating:hover .sidebar-brand,
-.sidebar-pinned .sidebar-brand {
-  justify-content: flex-start;
+  flex-shrink: 0;   /* 💡 don't let flex make it smaller */
 }
 
 
@@ -269,7 +303,7 @@ body {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 8px 12px;
+  padding: 2px 12px;
   border-radius: 999px;
   font-size: 14px;
   color: #0b1220;
@@ -281,6 +315,7 @@ body {
   position: relative;
   transition: color 0.15s ease;
 }
+
 
 /* fixed icon column so icons never move */
 
@@ -311,12 +346,18 @@ body {
   color: #9ca3af; /* grey icon */
 }
 
+.sidebar-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.75;
+}
+
 .sidebar-item:hover {
   color: #0b1220; /* dark text */
 }
 
 .sidebar-item:hover .sidebar-icon {
-  color: #0b1220; /* dark icon */
+  color: #0b1220;
   filter: brightness(1.4);
 }
 
@@ -363,7 +404,7 @@ body {
 
 
 .sidebar-item:hover .sidebar-label {
-  color: #111827;            /* strong dark on hover */
+  color: #111827;
 }
 
 .sidebar-item-active .sidebar-label {
@@ -371,20 +412,13 @@ body {
   font-weight: 600;          /* crisp active weight */
 }
 
-/* premium icon stroke style (Step Finance look) */
-.sidebar-icon svg {
-  width: 22px;
-  height: 22px;
-  stroke-width: 1.75; /* cleaner, sharper icons */
+/* (optional) if you still use sidebar-bottom-icon somewhere */
+.sidebar-bottom-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.5;
 }
 
-
-/* heroicon svg size locked */
-
-.sidebar-icon svg {
-  width: 22px;
-  height: 22px;
-}
 
 /* vertical accent bar */
 
@@ -444,12 +478,13 @@ body {
 }
 
 .main-floating {
-  margin-left: 64px;
+  margin-left: 80px;   /* same as sidebar-floating width */
 }
 
 .main-pinned {
-  margin-left: 220px;
+  margin-left: 260px;  /* same as sidebar-pinned width */
 }
+
 
 .main-inner {
   max-width: 960px;
@@ -466,3 +501,241 @@ body {
   color: #6b7280;
 }
 
+
+/* pin button placed in brand row */
+.pin-in-brand {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+  transition: 0.15s ease;
+}
+
+/* hide pin button when collapsed */
+.sidebar-floating .pin-in-brand {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* show pin button when expanded */
+.sidebar-floating:hover .pin-in-brand,
+.sidebar-pinned .pin-in-brand {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* wrapper for logo + name */
+.sidebar-logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* name stays hidden when collapsed */
+.sidebar-app-name {
+  display: none;
+  font-size: 17px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+/* show name ONLY when sidebar is hovered or pinned */
+.sidebar-floating:hover .sidebar-app-name,
+.sidebar-pinned .sidebar-app-name {
+  display: block;
+}
+
+/* divider & sections */
+.sidebar-section {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+
+/* footer area - twitter only */
+.sidebar-footer {
+  margin-top: auto;
+  border-top: 1px solid #e5e7eb;
+  padding: 14px 18px 10px 18px;
+}
+
+/* twitter row */
+.sidebar-footer-twitter {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 0;
+  color: #9ca3af;
+}
+
+/* twitter icon wrapper */
+.sidebar-bottom-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* twitter svg size */
+.sidebar-bottom-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.7;
+}
+
+/* handle text */
+.sidebar-footer-handle {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* hover state */
+.sidebar-footer-twitter:hover {
+  color: #111827;
+}
+
+.sidebar-footer-copy {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* make X icon + label react together on hover */
+.sidebar-footer-twitter svg,
+.sidebar-twitter-label {
+  opacity: 1;   /* subtle default */
+}
+
+
+/* copyright text: keep space, just fade it */
+.sidebar-footer-copy-text {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;   /* ← keep it on one line */
+}
+
+
+/* when sidebar is hovered open or pinned, show the text */
+.sidebar-floating:hover .sidebar-footer-copy-text,
+.sidebar-pinned .sidebar-footer-copy-text {
+  opacity: 1;
+}
+
+
+
+.sidebar-bottom-icon {
+  border: none;
+  background: transparent;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #9ca3af;
+}
+
+.sidebar-bottom-icon:hover {
+  color: #4b5563;
+}
+
+.sidebar-bottom-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* footer icons clean + centered */
+.sidebar-footer-icons {
+  display: flex;
+  justify-content: space-around;
+  padding: 0 25px;
+  margin-bottom: 8px;
+}
+
+.sidebar-bottom-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.sidebar-bottom-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.6;
+}
+
+.sidebar-bottom-icon:hover {
+  color: #0f172a;
+  transform: scale(1.1);
+}
+
+/* secondary rows use same size as main, just lighter text by default */
+.sidebar-item-secondary .sidebar-label {
+  color: #9ca3af;
+}
+
+/* on hover they behave like the main ones */
+.sidebar-item-secondary:hover .sidebar-label {
+  color: #111827;
+}
+
+.sidebar-twitter-alone {
+  padding: 10px 18px 6px 18px; /* similar to footer spacing */
+}
+
+.sidebar-twitter-alone {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 175px;
+  padding: 14px 18px 8px 18px; 
+}
+
+.sidebar-twitter-label {
+  font-size: 13px;
+  color: #9ca3af;            /* light grey */
+  margin-left: 6px;
+  white-space: nowrap;
+  display: none;             /* hidden when collapsed */
+}
+
+/* show label when sidebar open */
+.sidebar-floating:hover .sidebar-twitter-label,
+.sidebar-pinned .sidebar-twitter-label {
+  display: inline;
+  color: #6b7280;            /* slightly darker */
+}
+
+/* base grey for all non active items */
+.sidebar-item:not(.sidebar-item-active) .sidebar-label {
+  color: #9ca3af;
+}
+
+.sidebar-item:not(.sidebar-item-active) .sidebar-icon {
+  color: #9ca3af;
+}
+
+/* dark on hover for non active items */
+.sidebar-item:not(.sidebar-item-active):hover .sidebar-label {
+  color: #0b1220;
+}
+
+.sidebar-item:not(.sidebar-item-active):hover .sidebar-icon {
+  color: #0b1220;
+}
