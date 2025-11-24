@@ -44,13 +44,46 @@ body {
   align-items: center;
   justify-content: space-between;
 
-  height: 78px;               /* bigger like Step */
-  padding: 16px 32px;         /* more breathing room */
+  height: 78px;
+  padding: 16px 32px;
 
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
 
   transition: margin-left 0.2s ease;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+
+.search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+}
+
+.search-wrapper input {
+  width: 100%;
+  height: 44px;
+  padding: 10px 14px 10px 40px; /* space for icon */
+  border-radius: 10px;
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none; /* so clicks go to input */
 }
 
 
@@ -66,9 +99,11 @@ body {
 
 
 .header-left {
-  width: 180px;              /* more space for title */
-  font-size: 20px;           /* bigger title */
+  width: 150px;  
+  font-size: 20px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
 }
 
 
@@ -76,25 +111,44 @@ body {
   flex: 1;
   display: flex;
   justify-content: center;
+  padding: 0 40px;    /* gives breathing room */
 }
 
 .header-center input {
-  height: 44px;              /* taller search box */
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 14px;
+  width: 100%;
+  max-width: 380px;
+  height: 44px;
+  padding: 10px 14px 10px 40px;  /* space for icon on the left */
+  border-radius: 10px;
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  font-size: 16px;
+  font-weight: 500;          /* medium = premium */
+  letter-spacing: -0.01em;   /* subtle tighten */
+  color: #0f172a;
 }
 
 .header-center input::placeholder {
+  font-weight: 400;
+  letter-spacing: -0.01em;
   color: #9ca3af;
 }
 
 .header-right button {
-  height: 44px;              /* taller button */
+  height: 44px;
   padding: 0 20px;
-  border-radius: 12px;
-  font-size: 14px;
+  border-radius: 10px;
+  background: #ffffff;            /* white like search bar */
+  border: 1px solid #d9d9d9;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #131212;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
 
 .header-right button:disabled {
   opacity: 0.6;
@@ -399,18 +453,10 @@ body {
 
 .sidebar-item-active .sidebar-label {
   color: #111827;
-  font-weight: 600;
-}
-
-
-.sidebar-item:hover .sidebar-label {
-  color: #111827;
-}
-
-.sidebar-item-active .sidebar-label {
-  color: #111827;
   font-weight: 600;          /* crisp active weight */
 }
+
+
 
 /* (optional) if you still use sidebar-bottom-icon somewhere */
 .sidebar-bottom-icon svg {
@@ -442,6 +488,7 @@ body {
 .sidebar-item-active::before {
   background: #0b1220;
 }
+
 
 /* hover / active text */
 
@@ -488,6 +535,9 @@ body {
 
 .main-inner {
   max-width: 960px;
+  margin: 0 auto;          /* center horizontally */
+  width: 100%;             /* allow shrink/grow */
+  padding: 0 20px;         /* optional: comfy space on sides */
 }
 
 .page-title {
@@ -501,6 +551,442 @@ body {
   color: #6b7280;
 }
 
+
+.main-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+/* stat cards row */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.positions-section {
+  margin-top: 26px;
+}
+
+.positions-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.section-subtitle {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+/* table shell */
+.positions-table {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+/* rows */
+.positions-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1.1fr 1.1fr 1.3fr 1.1fr; /* token / price / amount / pnl / value */
+  padding: 10px 16px;
+  font-size: 13px;
+  align-items: center;
+}
+
+
+.positions-row-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  background: #f9fafb;
+}
+
+/* light row borders */
+.positions-row:not(.positions-row-head) + .positions-row {
+  border-top: 1px solid #f1f5f9;
+}
+
+/* columns */
+.col-token {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.col-price,
+.col-amount,
+.col-pnl,
+.col-value {
+  text-align: right;
+  color: #0f172a;
+}
+
+
+/* pill for asset name */
+.asset-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* pnl colors */
+.col-pnl-up {
+  color: #16a34a;
+}
+
+.col-pnl-down {
+  color: #ef4444;
+}
+
+.col-pnl-flat {
+  color: #9ca3af;
+}
+
+/* main portfolio value widget */
+.portfolio-header-card {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 26px;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+}
+
+.portfolio-chart {
+  width: 180px;
+  height: 60px;
+}
+
+.portfolio-chart svg {
+  width: 100%;
+  height: 100%;
+}
+
+.portfolio-chart-line {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.portfolio-chart-fill {
+  stroke: none;
+}
+
+/* green vs red */
+.chart-up .portfolio-chart-line {
+  stroke: #22c55e;
+}
+
+.chart-up .portfolio-chart-fill {
+  fill: rgba(34, 197, 94, 0.15);
+}
+
+.chart-down .portfolio-chart-line {
+  stroke: #ef4444;
+}
+
+.chart-down .portfolio-chart-fill {
+  fill: rgba(239, 68, 68, 0.18);
+}
+
+/* text */
+.portfolio-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.portfolio-main-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.portfolio-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+.portfolio-change {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.portfolio-change.up {
+  color: #16a34a;
+}
+
+.portfolio-change.down {
+  color: #ef4444;
+}
+
+.portfolio-subnote {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* dropdown + info icons */
+.portfolio-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.icon-dropdown,
+.icon-info {
+  font-size: 14px;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.stat-note {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* main portfolio value widget */
+.portfolio-header-card {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 26px;
+
+  /* subtle premium shadow */
+  box-shadow: 0px 2px 5px rgba(15,23,42,0.04);
+}
+
+/* split card: left meta / right net worth */
+.portfolio-header-card {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+}
+
+.portfolio-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.portfolio-networth {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* wallet identity */
+.wallet-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wallet-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallet-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.wallet-status-pill {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  color: #9ca3af;
+  background: #f9fafb;
+}
+
+.wallet-address-text {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* quick action buttons */
+.wallet-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wallet-action-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: default;           /* for now they are disabled */
+}
+
+.wallet-action-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* net worth right side layout */
+.portfolio-networth-main {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+/* the chart area */
+.portfolio-chart {
+  width: 160px;
+  height: 60px;
+  background: url("/placeholder-chart.png");
+  background-size: cover;
+  background-position: center;
+  opacity: 0.9;
+}
+
+/* big value */
+.portfolio-value {
+  font-size: 34px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+/* green percent */
+.portfolio-change {
+  font-size: 18px;
+  font-weight: 600;
+  color: #22c55e;
+  margin-left: 6px;
+}
+
+/* icons next to percent */
+.portfolio-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+}
+
+.icon-dropdown,
+.icon-info {
+  font-size: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+
+.portfolio-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.portfolio-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.portfolio-title {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.portfolio-title-caret {
+  font-size: 11px;
+  color: #9ca3af;
+  transform: translateY(1px);
+}
 
 /* pin button placed in brand row */
 .pin-in-brand {
@@ -569,6 +1055,7 @@ body {
   border-top: 1px solid #e5e7eb;
   padding: 14px 18px 10px 18px;
 }
+
 
 /* twitter row */
 .sidebar-footer-twitter {
@@ -715,6 +1202,17 @@ body {
   display: none;             /* hidden when collapsed */
 }
 
+
+.asset-pill-link {
+  text-decoration: none;
+}
+
+.asset-pill-link:hover {
+  cursor: pointer;
+}
+
+/* you already have the glow styles for .asset-pill and dark mode */
+
 /* show label when sidebar open */
 .sidebar-floating:hover .sidebar-twitter-label,
 .sidebar-pinned .sidebar-twitter-label {
@@ -738,4 +1236,369 @@ body {
 
 .sidebar-item:not(.sidebar-item-active):hover .sidebar-icon {
   color: #0b1220;
+}
+
+.theme-toggle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+  background: #f3f4f6;
+}
+
+/* dark theme base */
+body[data-theme="dark"] {
+  background: #020617;
+  color: #e5e7eb;
+}
+
+/* header dark */
+body[data-theme="dark"] .header {
+  background: #020617;
+  border-bottom-color: #111827;
+}
+
+/* sidebar dark */
+body[data-theme="dark"] .sidebar {
+  background: #020617;
+  border-right-color: #111827;
+}
+
+/* main area dark */
+body[data-theme="dark"] .main {
+  background: #020617;
+}
+
+/* labels + icons a bit lighter in dark */
+body[data-theme="dark"] .sidebar-label {
+  color: #cbd5f5;
+}
+
+body[data-theme="dark"] .sidebar-item:not(.sidebar-item-active) .sidebar-icon {
+  color: #9ca3af;
+}
+
+
+/* --- DARK MODE PREMIUM FIXES --- */
+
+/* soft grey labels + icons */
+body[data-theme="dark"] .sidebar-label {
+  color: #cbd5e1;
+}
+
+body[data-theme="dark"] .sidebar-icon {
+  color: #94a3b8;
+}
+
+/* hover becomes bright white */
+body[data-theme="dark"] .sidebar-item:hover .sidebar-label,
+body[data-theme="dark"] .sidebar-item:hover .sidebar-icon {
+  color: #ffffff;
+}
+
+/* active item bright & clear */
+body[data-theme="dark"] .sidebar-item-active .sidebar-label {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+body[data-theme="dark"] .sidebar-item-active .sidebar-icon {
+  color: #ffffff;
+  filter: brightness(1.4);
+}
+
+/* active vertical bar */
+body[data-theme="dark"] .sidebar-item-active::before {
+  background: #4f8aff;
+}
+
+/* dividers */
+body[data-theme="dark"] .sidebar-section,
+body[data-theme="dark"] .sidebar-footer {
+  border-top-color: #1e2533;
+}
+
+/* dapp name fix in dark mode */
+body[data-theme="dark"] .sidebar-app-name {
+  color: #e2e8f0;   /* soft premium white */
+}
+
+body[data-theme="dark"] .stat-card {
+  background: #020617;
+  border-color: #111827;
+  box-shadow: none;
+}
+
+body[data-theme="dark"] .stat-value {
+  color: #e5e7eb;
+}
+
+body[data-theme="dark"] .stat-note,
+body[data-theme="dark"] .stat-label {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .page-tag {
+  background: #020617;
+  border-color: #1e293b;
+  color: #94a3b8;
+}
+
+body[data-theme="dark"] .portfolio-header-card {
+  background: #020617;
+  border-color: #1e293b;
+  box-shadow: none;
+}
+
+body[data-theme="dark"] .portfolio-value {
+  color: #e2e8f0;
+}
+
+body[data-theme="dark"] .portfolio-change {
+  color: #4ade80;
+}
+
+body[data-theme="dark"] .icon-dropdown,
+body[data-theme="dark"] .icon-info {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .portfolio-header-card {
+  background: #020617;
+  border-color: #1e293b;
+  box-shadow: none;
+}
+
+body[data-theme="dark"] .portfolio-value {
+  color: #e2e8f0;
+}
+
+body[data-theme="dark"] .portfolio-subnote {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .icon-dropdown,
+body[data-theme="dark"] .icon-info {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .chart-up .portfolio-chart-fill {
+  fill: rgba(34, 197, 94, 0.25);
+}
+
+body[data-theme="dark"] .chart-down .portfolio-chart-fill {
+  fill: rgba(239, 68, 68, 0.3);
+}
+
+body[data-theme="dark"] .positions-table {
+  background: #020617;
+  border-color: #1e293b;
+}
+
+body[data-theme="dark"] .positions-row-head {
+  background: #020617;
+  color: #64748b;
+}
+
+body[data-theme="dark"] .positions-row:not(.positions-row-head) + .positions-row {
+  border-top-color: #111827;
+}
+
+body[data-theme="dark"] .section-title {
+  color: #e2e8f0;
+}
+
+body[data-theme="dark"] .section-subtitle {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .col-price,
+body[data-theme="dark"] .col-amount,
+body[data-theme="dark"] .col-value {
+  color: #e5e7eb;
+}
+
+
+body[data-theme="dark"] .asset-pill {
+  background: rgba(79, 70, 229, 0.12);
+  color: #c7d2fe;
+}
+
+body[data-theme="dark"] .portfolio-title {
+  color: #e2e8f0;
+}
+
+body[data-theme="dark"] .portfolio-title-caret {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .portfolio-header-card {
+  background: #020617;
+  border-color: #1e293b;
+  box-shadow: none;
+}
+
+body[data-theme="dark"] .wallet-label {
+  color: #e2e8f0;
+}
+
+body[data-theme="dark"] .wallet-status-pill {
+  border-color: #1e293b;
+  background: #020617;
+  color: #64748b;
+}
+
+body[data-theme="dark"] .wallet-address-text {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .wallet-action-btn {
+  border-color: #1e293b;
+  background: #020617;
+  color: #cbd5e1;
+}
+
+/* ===========================
+   DARK THEME (CLEAN + PREMIUM)
+   =========================== */
+
+body[data-theme="dark"] {
+  background: #020617;
+  color: #e5e7eb;
+}
+
+/* HEADER */
+body[data-theme="dark"] .header {
+  background: #020617;
+  border-bottom-color: #111827;
+}
+
+/* SIDEBAR */
+body[data-theme="dark"] .sidebar {
+  background: #020617;
+  border-right-color: #111827;
+}
+
+body[data-theme="dark"] .sidebar-label {
+  color: #cbd5e1;
+}
+
+body[data-theme="dark"] .sidebar-icon {
+  color: #94a3b8;
+}
+
+body[data-theme="dark"] .sidebar-item:hover .sidebar-label,
+body[data-theme="dark"] .sidebar-item:hover .sidebar-icon {
+  color: #ffffff;
+}
+
+body[data-theme="dark"] .sidebar-item-active .sidebar-label,
+body[data-theme="dark"] .sidebar-item-active .sidebar-icon {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+body[data-theme="dark"] .sidebar-item-active::before {
+  background: #4f8aff;
+}
+
+body[data-theme="dark"] .sidebar-section,
+body[data-theme="dark"] .sidebar-footer {
+  border-top-color: #1e2533;
+}
+
+body[data-theme="dark"] .sidebar-app-name {
+  color: #e2e8f0;
+}
+
+/* ===========================
+   PREMIUM CARDS (DEBANK STYLE)
+   =========================== */
+
+body[data-theme="dark"] .portfolio-header-card,
+body[data-theme="dark"] .stat-card,
+body[data-theme="dark"] .positions-table {
+  background:
+    radial-gradient(circle at top left, rgba(148, 163, 184, 0.12), transparent 60%),
+    #020617;
+  border-color: #1f2937;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.6);
+}
+
+/* NET WORTH SECTION */
+body[data-theme="dark"] .portfolio-value {
+  color: #f1f5f9;
+}
+
+body[data-theme="dark"] .portfolio-change.up {
+  color: #4ade80;
+}
+
+body[data-theme="dark"] .portfolio-change.down {
+  color: #f87171;
+}
+
+body[data-theme="dark"] .portfolio-subnote {
+  color: #64748b;
+}
+
+/* TABLE (holdings) */
+body[data-theme="dark"] .positions-row-head {
+  background: #02081a;
+  color: #8696b0;
+}
+
+body[data-theme="dark"] .positions-row:not(.positions-row-head) {
+  background: #020617;
+}
+
+body[data-theme="dark"] .positions-row:not(.positions-row-head):hover {
+  background: #050b1e;
+}
+
+body[data-theme="dark"] .positions-row + .positions-row {
+  border-top-color: #111827;
+}
+
+body[data-theme="dark"] .col-price,
+body[data-theme="dark"] .col-amount,
+body[data-theme="dark"] .col-value {
+  color: #e5e7eb;
+}
+
+/* TOKEN PILL */
+body[data-theme="dark"] .asset-pill {
+  background: rgba(79, 70, 229, 0.12);
+  color: #c7d2fe;
+}
+
+/* WALLET SECTION */
+body[data-theme="dark"] .wallet-label {
+  color: #e2e8f0;
+}
+
+body[data-theme="dark"] .wallet-status-pill {
+  background: #020617;
+  border-color: #1e293b;
+  color: #94a3b8;
+}
+
+body[data-theme="dark"] .wallet-address-text {
+  color: #64748b;
+}
+
+body[data-theme="dark"] .wallet-action-btn {
+  background: #020617;
+  border-color: #1e293b;
+  color: #cbd5e1;
 }
