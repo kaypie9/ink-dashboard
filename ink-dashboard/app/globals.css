@@ -697,8 +697,10 @@ body {
 }
 
 .portfolio-chart {
-  width: 180px;
-  height: 60px;
+  height: 140px;     /* bigger chart */
+  width: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .portfolio-chart svg {
@@ -824,6 +826,27 @@ body {
   box-shadow: 0px 2px 5px rgba(15,23,42,0.04);
 }
 
+.refresh-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.refresh-btn:hover {
+  background: #f3f4f6;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* split card: left meta / right net worth */
 .portfolio-header-card {
   width: 100%;
@@ -837,7 +860,73 @@ body {
   gap: 24px;
   margin-bottom: 26px;
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+
+/* layout for the top card */
+.portfolio-header-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 2.5fr);
+  column-gap: 40px;
+  align-items: center;
 }
+
+/* push Net worth away from the wallet block and add a soft divider */
+.portfolio-networth {
+  padding-left: 32px;
+  border-left: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+/* make chart + numbers fill the right side nicely */
+.portfolio-networth-main {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 24px;
+  align-items: center;
+}
+
+
+  /* for loading overlay */
+  position: relative;
+  overflow: hidden;
+}
+
+/* overlay when loading a wallet */
+.portfolio-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(248, 250, 252, 0.7);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* little spinner */
+.portfolio-loading-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.5);
+  border-top-color: #4f46e5;
+  animation: spin 0.8s linear infinite;
+}
+
+.portfolio-loading-text {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+/* spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 
 .portfolio-meta {
   flex: 1;
@@ -1601,4 +1690,611 @@ body[data-theme="dark"] .wallet-action-btn {
   background: #020617;
   border-color: #1e293b;
   color: #cbd5e1;
+}
+
+body[data-theme="dark"] .portfolio-loading-overlay {
+  background: rgba(15, 23, 42, 0.78);
+}
+
+body[data-theme="dark"] .portfolio-loading-spinner {
+  border-color: rgba(148, 163, 184, 0.5);
+  border-top-color: #38bdf8;
+}
+
+body[data-theme="dark"] .portfolio-loading-text {
+  color: #9ca3af;
+}
+
+body[data-theme="dark"] .refresh-btn {
+  background: #020617;
+  border-color: #1e293b;
+  color: #cbd5e1;
+}
+
+body[data-theme="dark"] .refresh-btn:hover {
+  background: #0f172a;
+}
+
+
+
+
+
+
+.refresh-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.refresh-btn:hover {
+  background: #f3f4f6;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* small overlay inside portfolio card while loading */
+.portfolio-loading-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 2;
+}
+
+.portfolio-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #d1d5db;
+  border-top-color: #4f46e5;
+  animation: spin 0.7s linear infinite;
+}
+
+.portfolio-loading-text {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* dark mode tweaks */
+body[data-theme="dark"] .refresh-btn {
+  background: #020617;
+  border-color: #1e293b;
+  color: #cbd5e1;
+}
+
+body[data-theme="dark"] .refresh-btn:hover {
+  background: #0f172a;
+}
+
+body[data-theme="dark"] .portfolio-loading-overlay {
+  background: rgba(15, 23, 42, 0.75);
+}
+
+body[data-theme="dark"] .portfolio-loading-text {
+  color: #cbd5e1;
+}
+
+.refresh-round-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.refresh-round-btn:hover {
+  background: #f3f4f6;
+}
+
+.refresh-round-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.spin-refresh {
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+
+/* dark mode */
+body[data-theme="dark"] .refresh-round-btn {
+  background: #020617;
+  border-color: #1e293b;
+}
+
+body[data-theme="dark"] .refresh-round-btn:hover {
+  background: #0f172a;
+}
+
+.portfolio-range-switch {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 10px;
+}
+
+.range-btn {
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.range-btn-active {
+  background: var(--ink-surface-elevated, rgba(255, 255, 255, 0.06));
+  opacity: 1;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.portfolio-networth {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portfolio-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.portfolio-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-title-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.04);
+  color: rgba(15, 23, 42, 0.6);
+}
+
+[data-theme='dark'] .portfolio-title-pill {
+  background: rgba(148, 163, 184, 0.18);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.portfolio-range-switch {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 10px;
+}
+
+.range-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.range-btn-active {
+  background: rgba(15, 23, 42, 0.06);
+  opacity: 1;
+}
+
+[data-theme='dark'] .range-btn-active {
+  background: rgba(148, 163, 184, 0.26);
+}
+
+.premium-networth {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(200px, 0.9fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.portfolio-chart-wrapper {
+  position: relative;
+  min-width: 0;
+}
+
+.portfolio-chart-bg {
+  position: absolute;
+  inset: 12px 0 0 0;
+  border-radius: 14px;
+  background: linear-gradient(
+    to bottom,
+    rgba(34, 197, 94, 0.18),
+    rgba(34, 197, 94, 0)
+  );
+  pointer-events: none;
+}
+
+.chart-tooltip {
+  position: absolute;
+  bottom: 100%;
+  transform: translateX(-50%) translateY(-8px);
+  pointer-events: none;
+}
+
+.chart-tooltip-inner {
+  background: #0f172a;
+  color: #e5e7eb;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+  min-width: 140px;
+}
+
+.chart-tooltip-date {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.chart-tooltip-label {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.chart-tooltip-value {
+  font-weight: 600;
+}
+
+.chart-tooltip-dot-icon {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #22c55e;
+  margin-right: 4px;
+}
+
+/* hover marker on the chart */
+.chart-hover-line {
+  stroke: rgba(148, 163, 184, 0.7);
+  stroke-width: 0.5;
+  stroke-dasharray: 2;
+}
+
+.chart-hover-dot {
+  fill: #22c55e;
+  stroke: #ffffff;
+  stroke-width: 0.6;
+}
+
+/* dark theme tweaks */
+[data-theme='dark'] .chart-tooltip-inner {
+  background: #020617;
+  color: #e5e7eb;
+}
+
+[data-theme='dark'] .chart-hover-line {
+  stroke: rgba(148, 163, 184, 0.5);
+}
+
+[data-theme='dark'] .chart-hover-dot {
+  fill: #22c55e;
+  stroke: #020617;
+}
+
+[data-theme='dark'] .portfolio-chart-bg {
+  background: linear-gradient(
+    to bottom,
+    rgba(45, 212, 191, 0.24),
+    rgba(45, 212, 191, 0)
+  );
+}
+
+.portfolio-chart {
+  position: relative;
+  height: 110px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.portfolio-header-content.premium-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.premium-main-row {
+  display: flex;
+  align-items: center;   /* keeps pill centered vertically */
+  justify-content: flex-start; /* keep pill close to $ amount */
+  gap: 10px;             /* nice spacing */
+}
+
+
+.portfolio-main-left {
+  display: flex;
+  align-items: center;   /* FIX: centers pill with $ value */
+  gap: 8px;
+}
+
+
+.portfolio-value {
+  font-size: 26px;
+  line-height: 1.5;   /* makes it match the pill height */
+  font-weight: 600;
+}
+
+
+.portfolio-change-pill {
+  position: relative;
+  top: -1px;  /* MAGIC: nudges pill down slightly */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.pill-up {
+  background: rgba(22, 163, 74, 0.1);
+  color: rgb(21, 128, 61);
+}
+
+.pill-down {
+  background: rgba(220, 38, 38, 0.1);
+  color: rgb(185, 28, 28);
+}
+
+[data-theme='dark'] .pill-up {
+  background: rgba(34, 197, 94, 0.16);
+  color: rgb(74, 222, 128);
+}
+
+[data-theme='dark'] .pill-down {
+  background: rgba(248, 113, 113, 0.16);
+  color: rgb(252, 165, 165);
+}
+
+.change-arrow {
+  font-size: 11px;
+}
+
+.portfolio-tag-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.portfolio-tag-row {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+
+.portfolio-tag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+}
+
+[data-theme='dark'] .portfolio-tag-dot {
+  background: #4ade80;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.24);
+}
+
+.premium-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-top: 2px;
+  color: rgba(15, 23, 42, 0.6);
+}
+.portfolio-pnl-abs,
+.portfolio-pnl-pct {
+  font-size: 12px;
+}
+
+.pnl-up {
+  color: #16a34a;
+}
+
+.pnl-down {
+  color: #ef4444;
+}
+
+
+[data-theme='dark'] .premium-sub-row {
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.portfolio-sub-value {
+  font-weight: 500;
+}
+
+/* fix: keep net worth header above the next cards */
+.portfolio-header-card {
+  margin-bottom: 36px;   /* more space under the card */
+  position: relative;
+  overflow: visible;     /* do NOT cut off live snapshot text */
+  z-index: 1;
+}
+
+.stats-grid {
+  margin-top: 0;         /* make sure it does not climb up */
+  position: relative;
+  z-index: 0;
+}
+
+/* DARK MODE POLISH FOR DASHBOARD  */
+
+body[data-theme='dark'] .page-subtitle {
+  color: #64748b;
+}
+
+/* top card title + range buttons */
+body[data-theme='dark'] .portfolio-title {
+  color: #e2e8f0;
+}
+
+body[data-theme='dark'] .portfolio-title-pill {
+  background: rgba(148, 163, 184, 0.18);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+body[data-theme='dark'] .range-btn {
+  color: #9ca3af;
+}
+
+body[data-theme='dark'] .range-btn-active {
+  background: rgba(148, 163, 184, 0.26);
+  color: #e5e7eb;
+}
+
+/* soft divider between wallet and net worth */
+body[data-theme='dark'] .portfolio-networth {
+  border-left-color: rgba(148, 163, 184, 0.35);
+}
+
+/* holdings table header and flat pnl */
+body[data-theme='dark'] .positions-row-head {
+  background: #02081a;
+  color: #8696b0;
+}
+
+body[data-theme='dark'] .col-pnl-flat {
+  color: #64748b;
+}
+
+/* little subtitle under sections (eg: real balances...) */
+body[data-theme='dark'] .section-subtitle {
+  color: #64748b;
+}
+
+/* chart tooltip + hover line tweaks */
+body[data-theme='dark'] .chart-tooltip-inner {
+  background: #020617;
+  color: #e5e7eb;
+}
+
+body[data-theme='dark'] .chart-hover-line {
+  stroke: rgba(148, 163, 184, 0.7);
+}
+
+body[data-theme='dark'] .chart-hover-dot {
+  fill: #22c55e;
+  stroke: #020617;
+}
+
+/* dark mode: make refresh button visible */
+body[data-theme='dark'] .refresh-round-btn {
+  background: #020617;
+  border-color: #334155;      /* lighter border so it stands out */
+}
+
+body[data-theme='dark'] .refresh-round-btn svg {
+  width: 18px;
+  height: 18px;
+  color: #e5e7eb;            /* bright icon in dark mode */
+}
+
+/* dark mode: chart hover visibility */
+body[data-theme='dark'] .chart-tooltip-inner {
+  background: #020617;
+  color: #e5e7eb;
+  border: 1px solid #1e293b;
+}
+
+body[data-theme='dark'] .chart-hover-line {
+  stroke: #38bdf8;           /* bright cyan vertical line */
+  stroke-width: 0.7;
+  stroke-dasharray: 2;
+}
+
+body[data-theme='dark'] .chart-hover-dot {
+  fill: #22c55e;             /* bright green dot */
+  stroke: #020617;
+  stroke-width: 0.8;
+}
+
+/* HARD OVERRIDE: chart hover in dark mode */
+
+body[data-theme='dark'] .chart-tooltip-inner {
+  background: #020617 !important;
+  color: #f9fafb !important;
+  border: 1px solid rgba(148, 163, 184, 0.9) !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.9) !important;
+}
+
+body[data-theme='dark'] .chart-tooltip-date {
+  color: #e5e7eb !important;
+  font-weight: 600 !important;
+}
+
+body[data-theme='dark'] .chart-tooltip-label {
+  color: #cbd5e1 !important;
+}
+
+body[data-theme='dark'] .chart-tooltip-value {
+  color: #f9fafb !important;
+}
+
+body[data-theme='dark'] .chart-tooltip-dot-icon {
+  background: #22c55e !important;
+}
+
+/* vertical hover line + dot */
+body[data-theme='dark'] .chart-hover-line {
+  stroke: #38bdf8 !important;
+  stroke-width: 1.1 !important;
+  stroke-dasharray: 3 !important;
+}
+
+body[data-theme='dark'] .chart-hover-dot {
+  fill: #22c55e !important;
+  stroke: #020617 !important;
+  stroke-width: 1.1 !important;
 }
