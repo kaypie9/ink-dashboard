@@ -923,10 +923,24 @@ const explorerTxUrl = walletAddress
                       )}
 
                       <span className="wallet-address-text">
-                        current view wallet:{" "}
-                        {walletAddress
-                          ? formatAddress(walletAddress)
-                          : "none selected"}
+<span className="wallet-address-text">
+  current view wallet:{" "}
+  {walletAddress ? (
+    <>
+      {formatAddress(walletAddress)}
+      <a
+        href={`https://explorer.inkonchain.com/address/${walletAddress}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="wallet-explorer-link"
+      >
+        🔗
+      </a>
+    </>
+  ) : (
+    "none selected"
+  )}
+</span>
                       </span>
 
 {walletAddress && (
