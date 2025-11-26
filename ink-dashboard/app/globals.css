@@ -69,13 +69,14 @@ body {
 .search-wrapper input {
   width: 100%;
   height: 44px;
-  padding: 10px 14px 10px 40px; /* space for icon */
+  padding: 10px 14px 10px 40px;
   border-radius: 10px;
-  border: 1px solid #d9d9d9;
-  background: #ffffff;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;        /* softer light grey */
   font-size: 14px;
   color: #0f172a;
 }
+
 
 .search-icon {
   position: absolute;
@@ -120,22 +121,11 @@ body {
   height: 44px;
   padding: 10px 14px 10px 40px;
   border-radius: 10px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+background: #f3f4f6;
+border-color: #d1d5db;
   font-size: 16px;
   font-weight: 500;
   color: #0f172a;
-}
-
-/* DARK MODE SEARCH BAR */
-body[data-theme="dark"] .header-center input {
-  background: #0f1629;        /* Same tone as premium cards */
-  border-color: #25304a;
-  color: #e5e7eb;
-}
-
-body[data-theme="dark"] .header-center input::placeholder {
-  color: #6b7280;             /* dimmer placeholder */
 }
 
 
@@ -153,12 +143,23 @@ body[data-theme="dark"] .header-center input::placeholder {
   background: #ffffff;            /* white like search bar */
   border: 1px solid #d9d9d9;
   font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: 0.2px;
   color: #131212;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  transition: all 0.15s ease;
+}
+
+.header-right button:hover {
+  transform: translateY(-1px);          /* subtle premium lift */
+  opacity: 0.9;
+}
+
+.header-right button:active {
+  transform: scale(0.97);
 }
 
 /* DARK MODE WALLET BUTTON PREMIUM */
@@ -3206,7 +3207,7 @@ body[data-theme="dark"] .theme-toggle-btn:hover {
 
 /* DARK MODE — search bar premium */
 body[data-theme="dark"] .header-center input {
-  background: #0f1626 !important;                   /* darker, matches buttons */
+  background: #131a29 !important;                   /* darker, matches buttons */
   border-color: rgba(148,163,184,0.22) !important;  /* soft grey border */
   color: #e5e7eb !important;
 }
@@ -3268,3 +3269,20 @@ body[data-theme="dark"] .wallet-copy-icon-btn:hover {
 }
 
 
+body[data-theme="light"] .header-right button {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #1f2937; /* clean dark text */
+}
+body[data-theme="light"] .header-right button:hover {
+  background: #f3f4f6;
+}
+
+body[data-theme="dark"] .header-right button {
+  background: #131a29;
+  border: 1px solid rgba(148,163,184,0.22);
+  color: #e5e7eb;
+}
+body[data-theme="dark"] .header-right button:hover {
+  background: #1a2336;
+}

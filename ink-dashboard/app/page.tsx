@@ -1114,24 +1114,21 @@ const explorerTxUrl = walletAddress
                           <span className="portfolio-value">{`$${currentValue.toFixed(
                             2
                           )}`}</span>
-
-                          <span
-                            className={`portfolio-change-pill ${
-                              isUp ? "pill-up" : "pill-down"
-                            }`}
-                          >
-                            <span className="change-arrow">
-                              {isUp ? "▲" : "▼"}
-                            </span>
-                            <span className="change-pct">
-                              {changePct.toFixed(2)}%
-                            </span>
-                          </span>
                         </div>
                       </div>
 
 {hasHistory ? (
   <div className="portfolio-sub-row premium-sub-row">
+    {/* percent pill on the left */}
+    <span
+      className={`portfolio-change-pill ${isUp ? "pill-up" : "pill-down"}`}
+      style={{ marginRight: "8px" }}
+    >
+      <span className="change-arrow">{isUp ? "▲" : "▼"}</span>
+      <span className="change-pct">{changePct.toFixed(2)}%</span>
+    </span>
+
+    {/* dollar change on the right */}
     <span
       className={`portfolio-sub-value portfolio-pnl-abs ${
         changeAbs >= 0 ? "pnl-up" : "pnl-down"
@@ -1141,11 +1138,12 @@ const explorerTxUrl = walletAddress
     </span>
   </div>
 ) : (
-        <div className="portfolio-sub-row premium-sub-row">
-          <span className="portfolio-sub-label">no history yet</span>
-          <span className="portfolio-sub-value">$0.00</span>
-        </div>
-      )}
+  <div className="portfolio-sub-row premium-sub-row">
+    <span className="portfolio-sub-label">no history yet</span>
+    <span className="portfolio-sub-value">$0.00</span>
+  </div>
+)}
+
 
                     </div>
                   </div>
