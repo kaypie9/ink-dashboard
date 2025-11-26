@@ -656,6 +656,32 @@ body {
   color: #0f172a;
 }
 
+.positions-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.positions-tab-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 152, 161, 0.4);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: transparent;
+  cursor: pointer;
+}
+
+.positions-tab-btn-active {
+  background: rgba(123, 97, 255, 0.08);
+  border-color: rgba(123, 97, 255, 0.9);
+  color: #7b61ff;
+}
+.positions-empty {
+  padding: 24px;
+  font-size: 14px;
+  color: #8a8f99;
+}
 
 /* pill for asset name */
 .asset-pill {
@@ -2297,4 +2323,189 @@ body[data-theme='dark'] .chart-hover-dot {
   fill: #22c55e !important;
   stroke: #020617 !important;
   stroke-width: 1.1 !important;
+}
+
+/* =============================
+   HOVER EFFECTS FOR MAIN CARDS
+   ============================= */
+
+.portfolio-header-card,
+.stat-card,
+.positions-table {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.portfolio-header-card:hover,
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+}
+
+/* table only: subtle raise */
+.positions-table:hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+/* dark mode hover tweaks */
+body[data-theme='dark'] .portfolio-header-card:hover,
+body[data-theme='dark'] .stat-card:hover,
+body[data-theme='dark'] .positions-table:hover {
+  border-color: #334155;
+}
+
+/* =============================
+   SKELETON SHIMMER (PURPLE GLASS)
+   ============================= */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+}
+
+.skeleton-rect {
+  border-radius: 10px;
+}
+
+.skeleton-sm {
+  height: 8px;
+  margin-bottom: 6px;
+}
+
+.skeleton-md {
+  height: 12px;
+  margin-bottom: 8px;
+}
+
+.skeleton-lg {
+  height: 18px;
+  margin-bottom: 10px;
+}
+
+.skeleton::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(168, 85, 247, 0.25),
+    rgba(56, 189, 248, 0.18),
+    transparent
+  );
+  animation: shimmer 1.1s linear infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* dark theme skeleton */
+body[data-theme='dark'] .skeleton {
+  background: rgba(15, 23, 42, 0.95);
+}
+
+/* =============================
+   TOKEN ICONS
+   ============================= */
+
+.token-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.token-icon-img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+/* dark mode token icon */
+body[data-theme='dark'] .token-icon {
+  background: #020617;
+  border: 1px solid #1e293b;
+  color: #e5e7eb;
+}
+
+/* =============================
+   WALLET COPY + TOOLTIP
+   ============================= */
+
+.wallet-address-row {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  position: relative;
+}
+
+.wallet-copy-hint {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.wallet-copy-tooltip {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #f9fafb;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.35);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.wallet-address-row.show-tooltip .wallet-copy-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* dark mode tooltip */
+body[data-theme='dark'] .wallet-copy-tooltip {
+  background: #e5e7eb;
+  color: #020617;
+}
+
+/* =============================
+   LAST UPDATED LABEL
+   ============================= */
+
+.main-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.last-updated-text {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+body[data-theme='dark'] .last-updated-text {
+  color: #64748b;
 }

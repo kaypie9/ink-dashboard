@@ -96,10 +96,45 @@ type TokenHolding = {
 
 type HistoryRange = "1W" | "1M" | "1Y";
 
+type PositionsTab = "wallet" | "yielding" | "nfts" | "transactions";
+
 type HistoryPoint = {
   t: number; // timestamp in ms
   v: number; // usd value
 };
+
+function isSpamToken(t: TokenHolding): boolean {
+  const price = t.priceUsd ?? 0;
+  const value = t.valueUsd ?? price * t.balance;
+
+  // if it has real value, keep it
+  if (value >= 0.01) return false;
+
+  const sym = (t.symbol || "").toLowerCase();
+
+  const looksLikeLink =
+    sym.includes("http") ||
+    sym.includes(".com") ||
+    sym.includes(".org") ||
+    sym.includes(".net") ||
+    sym.includes(".io");
+
+  const looksLikeBot =
+    sym.includes("bot") ||
+    sym.includes("telegram") ||
+    sym.includes("tg ") ||
+    sym.includes("@");
+
+  const veryLongSymbol = sym.length > 24;
+
+  // zero value and looks shady
+  if (!price && (looksLikeLink || looksLikeBot || veryLongSymbol)) {
+    return true;
+  }
+
+  return false;
+}
+
 
 function formatDateLabel(t: number) {
   const d = new Date(t);
@@ -120,6 +155,34 @@ function formatDateTimeLabel(t: number) {
     minute: "2-digit",
   });
 }
+
+function formatAddress(addr: string) {
+  if (!addr) return "";
+  if (addr.length <= 14) return addr;
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
+}
+
+function formatLastUpdated(ts: number | null): string {
+  if (!ts) return "";
+  const diffSec = Math.floor((Date.now() - ts) / 1000);
+
+  if (diffSec < 5) return "just now";
+  if (diffSec < 60) return `${diffSec} seconds ago`;
+
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) {
+    return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  }
+
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) {
+    return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  }
+
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 
 type PortfolioResponse = {
   mock: boolean;
@@ -151,33 +214,88 @@ export default function HomePage() {
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const [copied, setCopied] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+
+  // icons from Dexscreener keyed by token address
+  const [tokenIcons, setTokenIcons] = useState<{ [addr: string]: string }>({});
+
   // history range and data
   const [historyRange, setHistoryRange] = useState<HistoryRange>("1W");
   const [netWorthHistory, setNetWorthHistory] = useState<HistoryPoint[]>([]);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [positionsTab, setPositionsTab] = useState<PositionsTab>("wallet");
 
-  // central fetcher used by both auto load and manual refresh
-  const loadPortfolio = async (addr: string): Promise<PortfolioResponse | null> => {
-    if (!addr) return null;
+  const showSkeleton = isLoadingPortfolio && !portfolio;
 
-    try {
-      setIsLoadingPortfolio(true);
-      setPortfolioError(null);
 
-      const res = await fetch(`/api/portfolio?wallet=${addr}`);
-      if (!res.ok) throw new Error(`status ${res.status}`);
+// try to get token icon from backend that proxies Dexscreener
+const fetchDexIcon = async (address: string) => {
+  if (!address) return;
+  if (tokenIcons[address]) return;
 
-      const data: PortfolioResponse = await res.json();
-      setPortfolio(data);
-      return data;
-    } catch (err) {
-      console.error("portfolio fetch failed", err);
-      setPortfolioError("could not load portfolio");
-      return null;
-    } finally {
-      setIsLoadingPortfolio(false);
+  try {
+    const res = await fetch(
+      `/api/token-icon?address=${encodeURIComponent(address)}`
+    );
+
+    if (!res.ok) {
+      console.error('token-icon api failed', res.status);
+      return;
     }
-  };
+
+    const data: { iconUrl?: string | null } = await res.json();
+
+    if (!data.iconUrl) return;
+
+    const icon = data.iconUrl as string;
+
+    setTokenIcons(prev =>
+      prev[address] ? prev : { ...prev, [address]: icon }
+    );
+  } catch (e) {
+    console.error('token-icon api crashed', e);
+  }
+};
+
+
+// central fetcher used by both auto load and manual refresh
+const loadPortfolio = async (
+  addr: string
+): Promise<PortfolioResponse | null> => {
+  if (!addr) return null;
+
+  try {
+    setIsLoadingPortfolio(true);
+    setPortfolioError(null);
+
+    const res = await fetch(`/api/portfolio?wallet=${addr}`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+
+    const data: PortfolioResponse = await res.json();
+    setPortfolio(data);
+    setLastUpdatedAt(Date.now());
+
+    // try to fetch icons from Dexscreener for tokens missing iconUrl
+if (data?.tokens?.length) {
+  data.tokens.forEach((t) => {
+    if (!t.address) return;
+    if (t.iconUrl) return;
+    if (tokenIcons[t.address]) return;
+    fetchDexIcon(t.address);
+  });
+}
+
+    return data;
+  } catch (err) {
+    console.error("portfolio fetch failed", err);
+    setPortfolioError("could not load portfolio");
+    return null;
+  } finally {
+    setIsLoadingPortfolio(false);
+  }
+};
+
 
   // load history from backend with range
   const loadHistory = async (addr: string, range: HistoryRange) => {
@@ -387,6 +505,16 @@ const activePoint =
   const walletUsd = Math.max(totalValue - yieldingUsd, 0);
 
   const nftCount = 0;
+
+  const visibleTokens = portfolio
+    ? portfolio.tokens.filter((t) => !isSpamToken(t))
+    : [];
+
+    const yieldingPositions = portfolio?.vaults ?? [];
+
+const explorerTxUrl = walletAddress
+  ? `https://explorer.inkonchain.com/address/${walletAddress}?tab=txs`
+  : null;
 
   return (
     <>
@@ -638,15 +766,25 @@ const activePoint =
                 </p>
               </div>
 
-              <button
-                className="refresh-round-btn"
-                onClick={refreshAll}
-                disabled={isRefreshing || !walletAddress}
-              >
-                <span className={isRefreshing ? "spin-refresh" : ""}>
-                  <RefreshIcon />
+              <div className="main-header-right">
+                <span className="last-updated-text">
+                  {walletAddress && lastUpdatedAt
+                    ? `last updated ${formatLastUpdated(lastUpdatedAt)}`
+                    : walletAddress
+                    ? "no data yet"
+                    : "enter a wallet to start"}
                 </span>
-              </button>
+
+                <button
+                  className="refresh-round-btn"
+                  onClick={refreshAll}
+                  disabled={isRefreshing || !walletAddress}
+                >
+                  <span className={isRefreshing ? "spin-refresh" : ""}>
+                    <RefreshIcon />
+                  </span>
+                </button>
+              </div>
             </div>
 
                       {/* portfolio header card */}
@@ -672,9 +810,37 @@ const activePoint =
                       <span className="wallet-label">EVM Wallet</span>
                       <span className="wallet-status-pill">Not Connected</span>
                     </div>
-                    <div className="wallet-address-text">
-                      current view wallet: {walletAddress || "none selected"}
+                    <div
+                      className={
+                        "wallet-address-row" + (copied ? " show-tooltip" : "")
+                      }
+                      onClick={async () => {
+                        if (!walletAddress) return;
+                        try {
+                          await navigator.clipboard.writeText(walletAddress);
+                        } catch (e) {
+                          console.error("clipboard failed", e);
+                        }
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1200);
+                      }}
+                    >
+                      {copied && (
+                        <span className="wallet-copy-tooltip">copied</span>
+                      )}
+
+                      <span className="wallet-address-text">
+                        current view wallet:{" "}
+                        {walletAddress
+                          ? formatAddress(walletAddress)
+                          : "none selected"}
+                      </span>
+
+                      {walletAddress && (
+                        <span className="wallet-copy-hint">tap to copy</span>
+                      )}
                     </div>
+
                   </div>
 
                   <div className="wallet-actions-row">
@@ -865,138 +1031,371 @@ const activePoint =
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-label">wallet</div>
-                <div className="stat-value">{`$${walletUsd.toFixed(2)}`}</div>
-                <div className="stat-note">spot assets on ink</div>
+                {showSkeleton ? (
+                  <>
+                    <div className="skeleton skeleton-lg" />
+                    <div className="skeleton skeleton-sm" />
+                  </>
+                ) : (
+                  <>
+                    <div className="stat-value">{`$${walletUsd.toFixed(
+                      2
+                    )}`}</div>
+                    <div className="stat-note">spot assets on ink</div>
+                  </>
+                )}
               </div>
 
               <div className="stat-card">
                 <div className="stat-label">yielding</div>
-                <div className="stat-value">{`$${yieldingUsd.toFixed(
-                  2
-                )}`}</div>
-                <div className="stat-note">
-                  staked, deposits, positions
-                </div>
+                {showSkeleton ? (
+                  <>
+                    <div className="skeleton skeleton-lg" />
+                    <div className="skeleton skeleton-sm" />
+                  </>
+                ) : (
+                  <>
+                    <div className="stat-value">{`$${yieldingUsd.toFixed(
+                      2
+                    )}`}</div>
+                    <div className="stat-note">
+                      staked, deposits, positions
+                    </div>
+                  </>
+                )}
               </div>
+
 
               <div className="stat-card">
                 <div className="stat-label">nfts</div>
-                <div className="stat-value">{nftCount}</div>
-                <div className="stat-note">total ink nfts owned</div>
+                {showSkeleton ? (
+                  <>
+                    <div className="skeleton skeleton-lg" />
+                    <div className="skeleton skeleton-sm" />
+                  </>
+                ) : (
+                  <>
+                    <div className="stat-value">{nftCount}</div>
+                    <div className="stat-note">total ink nfts owned</div>
+                  </>
+                )}
               </div>
+
             </div>
 
-            {/* holdings table */}
-            <section className="positions-section">
-              <div className="positions-header-row">
-                <div>
-                  <h2 className="section-title">Holdings</h2>
-                  <p className="section-subtitle">
-                    real balances for this wallet from ink explorer
-                  </p>
-                </div>
-              </div>
+{/* holdings + tabs */}
+<section className="positions-section">
+  <div className="positions-header-row">
+    <div>
+      <h2 className="section-title">Portfolio</h2>
+      <p className="section-subtitle">
+        on ink for this wallet
+      </p>
+    </div>
 
-              <div className="positions-table">
-                {/* table header */}
-                <div className="positions-row positions-row-head">
-                  <span className="col-token">token</span>
-                  <span className="col-price">price</span>
-                  <span className="col-amount">amount</span>
-                  <span className="col-pnl">pnl 24h</span>
-                  <span className="col-value">value (usd)</span>
-                </div>
+    <div className="positions-tabs">
+      <button
+        className={
+          positionsTab === "wallet"
+            ? "positions-tab-btn positions-tab-btn-active"
+            : "positions-tab-btn"
+        }
+        onClick={() => setPositionsTab("wallet")}
+      >
+        Wallet
+      </button>
+      <button
+        className={
+          positionsTab === "yielding"
+            ? "positions-tab-btn positions-tab-btn-active"
+            : "positions-tab-btn"
+        }
+        onClick={() => setPositionsTab("yielding")}
+      >
+        Yielding
+      </button>
+      <button
+        className={
+          positionsTab === "nfts"
+            ? "positions-tab-btn positions-tab-btn-active"
+            : "positions-tab-btn"
+        }
+        onClick={() => setPositionsTab("nfts")}
+      >
+        NFTs
+      </button>
+            <button
+        className={
+          positionsTab === "transactions"
+            ? "positions-tab-btn positions-tab-btn-active"
+            : "positions-tab-btn"
+        }
+        onClick={() => setPositionsTab("transactions")}
+      >
+        Transactions
+      </button>
+    </div>
+  </div>
 
-                {/* loading state */}
-                {isLoadingPortfolio && (
-                  <div className="positions-row positions-row-empty">
-                    <span className="col-token">loading portfolio...</span>
-                    <span className="col-price"></span>
-                    <span className="col-amount"></span>
-                    <span className="col-pnl"></span>
-                    <span className="col-value"></span>
-                  </div>
-                )}
+  {/* TAB 1: wallet tokens (current table) */}
+  {positionsTab === "wallet" && (
+    <div className="positions-table">
+      {/* table header */}
+      <div className="positions-row positions-row-head">
+        <span className="col-token">token</span>
+        <span className="col-price">price</span>
+        <span className="col-amount">amount</span>
+        <span className="col-pnl">pnl 24h</span>
+        <span className="col-value">value (usd)</span>
+      </div>
 
-                {/* error state */}
-                {portfolioError && !isLoadingPortfolio && (
-                  <div className="positions-row positions-row-empty">
-                    <span className="col-token">could not load portfolio</span>
-                    <span className="col-price"></span>
-                    <span className="col-amount"></span>
-                    <span className="col-pnl"></span>
-                    <span className="col-value"></span>
-                  </div>
-                )}
+      {/* loading state */}
+      {showSkeleton && (
+        <div className="positions-row">
+          <span className="col-token">
+            <span className="token-icon skeleton skeleton-rect" />
+            <span className="skeleton skeleton-md" style={{ flex: 1 }} />
+          </span>
+          <span className="col-price">
+            <span className="skeleton skeleton-sm" />
+          </span>
+          <span className="col-amount">
+            <span className="skeleton skeleton-sm" />
+          </span>
+          <span className="col-pnl">
+            <span className="skeleton skeleton-sm" />
+          </span>
+          <span className="col-value">
+            <span className="skeleton skeleton-sm" />
+          </span>
+        </div>
+      )}
 
-                {/* no tokens */}
-                {!isLoadingPortfolio &&
-                  !portfolioError &&
-                  portfolio &&
-                  portfolio.tokens.length === 0 && (
-                    <div className="positions-row positions-row-empty">
-                      <span className="col-token">no tokens found</span>
-                      <span className="col-price"></span>
-                      <span className="col-amount"></span>
-                      <span className="col-pnl"></span>
-                      <span className="col-value"></span>
-                    </div>
+      {/* error state */}
+      {portfolioError && !isLoadingPortfolio && (
+        <div className="positions-row positions-row-empty">
+          <span className="col-token">could not load portfolio</span>
+          <span className="col-price"></span>
+          <span className="col-amount"></span>
+          <span className="col-pnl"></span>
+          <span className="col-value"></span>
+        </div>
+      )}
+
+{/* no tokens */}
+{!isLoadingPortfolio &&
+  !portfolioError &&
+  portfolio &&
+  visibleTokens.length === 0 && (
+    <div className="positions-row positions-row-empty">
+      <span className="col-token">no tokens found</span>
+      <span className="col-price"></span>
+      <span className="col-amount"></span>
+      <span className="col-pnl"></span>
+      <span className="col-value"></span>
+    </div>
+  )}
+
+
+      {/* real tokens from api */}
+{!isLoadingPortfolio &&
+  !portfolioError &&
+  portfolio &&
+  visibleTokens.map((t) => {
+          const price = t.priceUsd ?? 0;
+          const value = t.valueUsd ?? price * t.balance;
+          const pnl = 0;
+
+          const pnlClass =
+            pnl > 0
+              ? "col-pnl col-pnl-up"
+              : pnl < 0
+              ? "col-pnl col-pnl-down"
+              : "col-pnl col-pnl-flat";
+
+          return (
+            <div
+              className="positions-row"
+              key={t.address || t.symbol}
+            >
+              <span className="col-token">
+                <span className="token-icon">
+                  {t.iconUrl || tokenIcons[t.address] ? (
+                    <img
+                      src={t.iconUrl || tokenIcons[t.address]}
+                      alt={t.symbol || "token"}
+                      className="token-icon-img"
+                    />
+                  ) : (
+                    (t.symbol || "?").slice(0, 3).toUpperCase()
                   )}
+                </span>
 
-                {/* real tokens from /api/portfolio */}
-                {!isLoadingPortfolio &&
-                  !portfolioError &&
-                  portfolio &&
-                  portfolio.tokens.map((t) => {
-                    const price = t.priceUsd ?? 0;
-                    const value = t.valueUsd ?? price * t.balance;
-                    const pnl = 0;
+                <a
+                  className="asset-pill asset-pill-link"
+                  href={`https://explorer.inkonchain.com/token/${t.address}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t.symbol || "unknown"}
+                </a>
+              </span>
 
-                    const pnlClass =
-                      pnl > 0
-                        ? "col-pnl col-pnl-up"
-                        : pnl < 0
-                        ? "col-pnl col-pnl-down"
-                        : "col-pnl col-pnl-flat";
+              <span className="col-price">
+                {price ? `$${price.toFixed(4)}` : "-"}
+              </span>
 
-                    return (
-                      <div
-                        className="positions-row"
-                        key={t.address || t.symbol}
-                      >
-                        <span className="col-token">
-                          <a
-                            className="asset-pill asset-pill-link"
-                            href={`https://explorer.inkonchain.com/token/${t.address}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {t.symbol || "unknown"}
-                          </a>
-                        </span>
+              <span className="col-amount">
+                {t.balance.toFixed(4)}
+              </span>
 
-                        <span className="col-price">
-                          {price ? `$${price.toFixed(4)}` : "-"}
-                        </span>
+              <span className={pnlClass}>
+                {`${pnl > 0 ? "+" : ""}${(pnl || 0).toFixed(2)}%`}
+              </span>
 
-                        <span className="col-amount">
-                          {t.balance.toFixed(4)}
-                        </span>
+              <span className="col-value">
+                {`$${value.toFixed(2)}`}
+              </span>
+            </div>
+          );
+        })}
+    </div>
+  )}
 
-                        <span className={pnlClass}>
-                          {`${pnl > 0 ? "+" : ""}${(pnl || 0).toFixed(
-                            2
-                          )}%`}
-                        </span>
+  {/* TAB 2: yielding pools placeholder */}
+{positionsTab === "yielding" && (
+  <div className="positions-table">
+    <div className="positions-row positions-row-head">
+      <span className="col-token">position</span>
+      <span className="col-price">platform</span>
+      <span className="col-amount">amount</span>
+      <span className="col-pnl">apr</span>
+      <span className="col-value">value (usd)</span>
+    </div>
 
-                        <span className="col-value">
-                          {`$${value.toFixed(2)}`}
-                        </span>
-                      </div>
-                    );
-                  })}
-              </div>
-            </section>
+    {showSkeleton && (
+      <div className="positions-row">
+        <span className="col-token">
+          <span className="skeleton skeleton-md" style={{ flex: 1 }} />
+        </span>
+        <span className="col-price">
+          <span className="skeleton skeleton-sm" />
+        </span>
+        <span className="col-amount">
+          <span className="skeleton skeleton-sm" />
+        </span>
+        <span className="col-pnl">
+          <span className="skeleton skeleton-sm" />
+        </span>
+        <span className="col-value">
+          <span className="skeleton skeleton-sm" />
+        </span>
+      </div>
+    )}
+
+    {!showSkeleton &&
+      !portfolioError &&
+      portfolio &&
+      yieldingPositions.length === 0 && (
+        <div className="positions-row positions-row-empty">
+          <span className="col-token">no yielding positions found</span>
+          <span className="col-price"></span>
+          <span className="col-amount"></span>
+          <span className="col-pnl"></span>
+          <span className="col-value"></span>
+        </div>
+      )}
+
+    {!showSkeleton &&
+      !portfolioError &&
+      portfolio &&
+      yieldingPositions.map((v, idx) => {
+        const label =
+          (v.name as string) ||
+          (v.symbol as string) ||
+          (v.poolName as string) ||
+          "yield position";
+
+        const platform =
+          (v.protocol as string) ||
+          (v.platform as string) ||
+          "unknown";
+
+        const depositedUsd =
+          (v.depositedUsd as number) ??
+          (v.valueUsd as number) ??
+          (v.depositsUsd as number) ??
+          0;
+
+        const amount =
+          (v.amount as number) ??
+          (v.stakedAmount as number) ??
+          0;
+
+        const apr =
+          (v.apr as number) ??
+          (v.apy as number) ??
+          0;
+
+        return (
+          <div className="positions-row" key={idx}>
+            <span className="col-token">{label}</span>
+            <span className="col-price">{platform}</span>
+            <span className="col-amount">
+              {amount ? amount.toFixed(4) : "-"}
+            </span>
+            <span className="col-pnl">
+              {apr ? `${apr.toFixed(2)}%` : "-"}
+            </span>
+            <span className="col-value">
+              {`$${depositedUsd.toFixed(2)}`}
+            </span>
+          </div>
+        );
+      })}
+  </div>
+)}
+
+
+  {/* TAB 3: NFTs placeholder */}
+{positionsTab === "nfts" && (
+  <div className="positions-empty">
+    {walletAddress ? (
+      nftCount > 0 ? (
+        <p>{nftCount} NFTs detected for this wallet on ink</p>
+      ) : (
+        <p>no NFTs found yet for this wallet on ink</p>
+      )
+    ) : (
+      <p>enter a wallet above to check NFTs on ink</p>
+    )}
+  </div>
+)}
+
+
+    {/* TAB 4: transactions placeholder */}
+{positionsTab === "transactions" && (
+  <div className="positions-empty">
+    {walletAddress && explorerTxUrl ? (
+      <p>
+        full transaction history for this wallet is on ink explorer{" "}
+        <a
+          className="asset-pill asset-pill-link"
+          href={explorerTxUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          open explorer
+        </a>
+      </p>
+    ) : (
+      <p>enter a wallet above to see transactions</p>
+    )}
+  </div>
+)}
+
+
+</section>
           </div>
         </main>
       </div>
