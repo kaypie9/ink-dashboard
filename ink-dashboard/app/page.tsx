@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   HomeIcon,
   ArrowsRightLeftIcon,
@@ -101,6 +101,21 @@ type PositionsTab = "wallet" | "yielding" | "nfts" | "transactions";
 type HistoryPoint = {
   t: number; // timestamp in ms
   v: number; // usd value
+};
+
+type NftToken = {
+  contract: string;
+  tokenId: string;
+  name: string;
+  imageUrl?: string;
+};
+
+type NftCollection = {
+  address: string;
+  name: string;
+  symbol: string;
+  ownedCount: number;
+  tokens: NftToken[];
 };
 
 function isSpamToken(t: TokenHolding): boolean {
@@ -225,8 +240,16 @@ export default function HomePage() {
   const [netWorthHistory, setNetWorthHistory] = useState<HistoryPoint[]>([]);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [positionsTab, setPositionsTab] = useState<PositionsTab>("wallet");
-
   const showSkeleton = isLoadingPortfolio && !portfolio;
+
+  const [nftCollections, setNftCollections] = useState<NftCollection[] | null>(
+    null
+  );
+const [perCollectionSpentUsd, setPerCollectionSpentUsd] = useState<Record<string, number>>({});
+  const [isLoadingNfts, setIsLoadingNfts] = useState(false);
+  const [nftError, setNftError] = useState<string | null>(null);
+const [nftSortBy, setNftSortBy] = useState<"balance" | "spent" | null>(null);
+const [nftSortDir, setNftSortDir] = useState<"asc" | "desc">("desc");
 
 
 // try to get token icon from backend that proxies Dexscreener
@@ -341,13 +364,45 @@ if (data?.tokens?.length) {
     }
   };
 
+    // NFTS function
+
+    const loadNfts = async (addr: string) => {
+    if (!addr) return;
+
+    try {
+      setIsLoadingNfts(true);
+      setNftError(null);
+
+      const res = await fetch(`/api/nfts?wallet=${addr}`);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+
+      const json = await res.json();
+      const cols: NftCollection[] = Array.isArray(json.collections)
+        ? json.collections
+        : [];
+
+      setNftCollections(cols);
+      if (json.perCollectionSpentUsd) {
+  setPerCollectionSpentUsd(json.perCollectionSpentUsd);
+}
+    } catch (err) {
+      console.error("nfts fetch failed", err);
+      setNftError("could not load nfts");
+      setNftCollections([]);
+    } finally {
+      setIsLoadingNfts(false);
+    }
+  };
+
   // when wallet changes, load portfolio and default history
   useEffect(() => {
     if (!walletAddress) return;
 
     loadPortfolio(walletAddress);
     loadHistory(walletAddress, historyRange);
+    loadNfts(walletAddress);
   }, [walletAddress]);
+
 
   // when range changes, reload history only
   useEffect(() => {
@@ -504,7 +559,45 @@ const activePoint =
     : 0;
   const walletUsd = Math.max(totalValue - yieldingUsd, 0);
 
-  const nftCount = 0;
+   const nftCount = nftCollections
+    ? nftCollections.reduce(
+        (sum, c) => sum + (c.ownedCount || c.tokens.length || 0),
+        0
+      )
+    : 0;
+
+const sortedNfts = useMemo(() => {
+  if (!nftCollections) return [];
+
+  const arr = [...nftCollections];
+
+  if (nftSortBy === "balance") {
+    arr.sort((a, b) => {
+      const aBal = a.ownedCount || a.tokens.length || 0;
+      const bBal = b.ownedCount || b.tokens.length || 0;
+      return aBal - bBal;
+    });
+  } else if (nftSortBy === "spent") {
+    arr.sort((a, b) => {
+      const aSpent = perCollectionSpentUsd[a.address] || 0;
+      const bSpent = perCollectionSpentUsd[b.address] || 0;
+      return aSpent - bSpent;
+    });
+  }
+
+  if (nftSortDir === "desc") arr.reverse();
+  return arr;
+}, [nftCollections, nftSortBy, nftSortDir, perCollectionSpentUsd]);
+
+const handleNftSort = (key: "balance" | "spent") => {
+  if (nftSortBy === key) {
+    setNftSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+  } else {
+    setNftSortBy(key);
+    setNftSortDir("desc");
+  }
+};
+
 
   const visibleTokens = portfolio
     ? portfolio.tokens.filter((t) => !isSpamToken(t))
@@ -574,7 +667,7 @@ const explorerTxUrl = walletAddress
             {theme === "light" ? "☾" : "☀"}
           </button>
 
-          <button disabled>connect wallet</button>
+          <button>connect wallet</button>
         </div>
       </header>
 
@@ -836,9 +929,29 @@ const explorerTxUrl = walletAddress
                           : "none selected"}
                       </span>
 
-                      {walletAddress && (
-                        <span className="wallet-copy-hint">tap to copy</span>
-                      )}
+{walletAddress && (
+  <button
+    type="button"
+    className="wallet-copy-icon-btn"
+    aria-label="Copy address"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="9" width="11" height="11" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  </button>
+)}
+
                     </div>
 
                   </div>
@@ -1085,13 +1198,13 @@ const explorerTxUrl = walletAddress
 
 {/* holdings + tabs */}
 <section className="positions-section">
-  <div className="positions-header-row">
-    <div>
-      <h2 className="section-title">Portfolio</h2>
-      <p className="section-subtitle">
-        on ink for this wallet
-      </p>
-    </div>
+  <div className="ink-divider"></div>
+<div className="positions-header-row">
+  <div className="portfolio-title-stack">
+    <div className="section-title">PORTFOLIO</div>
+    <div className="section-subtitle">on ink</div>
+  </div>
+
 
     <div className="positions-tabs">
       <button
@@ -1138,16 +1251,16 @@ const explorerTxUrl = walletAddress
   </div>
 
   {/* TAB 1: wallet tokens (current table) */}
-  {positionsTab === "wallet" && (
-    <div className="positions-table">
-      {/* table header */}
-      <div className="positions-row positions-row-head">
-        <span className="col-token">token</span>
-        <span className="col-price">price</span>
-        <span className="col-amount">amount</span>
-        <span className="col-pnl">pnl 24h</span>
-        <span className="col-value">value (usd)</span>
-      </div>
+{positionsTab === 'wallet' && (
+  <div className='positions-table wallet-table'>
+    {/* table header */}
+    <div className='positions-row positions-row-head wallet-head'>
+      <span className='col-token wallet-head-col'>Token</span>
+      <span className='col-price wallet-head-col'>Price</span>
+      <span className='col-amount wallet-head-col'>Amount</span>
+      <span className='col-value wallet-head-col'>Value (USD)</span>
+    </div>
+
 
       {/* loading state */}
       {showSkeleton && (
@@ -1162,9 +1275,6 @@ const explorerTxUrl = walletAddress
           <span className="col-amount">
             <span className="skeleton skeleton-sm" />
           </span>
-          <span className="col-pnl">
-            <span className="skeleton skeleton-sm" />
-          </span>
           <span className="col-value">
             <span className="skeleton skeleton-sm" />
           </span>
@@ -1177,7 +1287,6 @@ const explorerTxUrl = walletAddress
           <span className="col-token">could not load portfolio</span>
           <span className="col-price"></span>
           <span className="col-amount"></span>
-          <span className="col-pnl"></span>
           <span className="col-value"></span>
         </div>
       )}
@@ -1191,7 +1300,6 @@ const explorerTxUrl = walletAddress
       <span className="col-token">no tokens found</span>
       <span className="col-price"></span>
       <span className="col-amount"></span>
-      <span className="col-pnl"></span>
       <span className="col-value"></span>
     </div>
   )}
@@ -1202,16 +1310,9 @@ const explorerTxUrl = walletAddress
   !portfolioError &&
   portfolio &&
   visibleTokens.map((t) => {
-          const price = t.priceUsd ?? 0;
-          const value = t.valueUsd ?? price * t.balance;
-          const pnl = 0;
+const price = t.priceUsd ?? 0
+const value = t.valueUsd ?? price * t.balance
 
-          const pnlClass =
-            pnl > 0
-              ? "col-pnl col-pnl-up"
-              : pnl < 0
-              ? "col-pnl col-pnl-down"
-              : "col-pnl col-pnl-flat";
 
           return (
             <div
@@ -1249,10 +1350,6 @@ const explorerTxUrl = walletAddress
                 {t.balance.toFixed(4)}
               </span>
 
-              <span className={pnlClass}>
-                {`${pnl > 0 ? "+" : ""}${(pnl || 0).toFixed(2)}%`}
-              </span>
-
               <span className="col-value">
                 {`$${value.toFixed(2)}`}
               </span>
@@ -1265,13 +1362,37 @@ const explorerTxUrl = walletAddress
   {/* TAB 2: yielding pools placeholder */}
 {positionsTab === "yielding" && (
   <div className="positions-table">
-    <div className="positions-row positions-row-head">
-      <span className="col-token">position</span>
-      <span className="col-price">platform</span>
-      <span className="col-amount">amount</span>
-      <span className="col-pnl">apr</span>
-      <span className="col-value">value (usd)</span>
-    </div>
+<div className="positions-row positions-row-head nft-head">
+
+  {/* PROTOCOL */}
+  <span className="col-token nft-head-col" style={{ width: "25%" }}>
+    Protocol
+  </span>
+
+  {/* POOL */}
+  <span className="col-token nft-head-col" style={{ width: "30%" }}>
+    Pool
+  </span>
+
+  {/* BALANCE */}
+  <span className="col-amount nft-head-col" style={{ width: "15%", textAlign: "center" }}>
+    Balance
+  </span>
+
+  {/* REWARDS */}
+  <span className="col-amount nft-head-col" style={{ width: "15%", textAlign: "center" }}>
+    Rewards
+  </span>
+
+  {/* VALUE */}
+  <span className="col-value nft-head-col" style={{ width: "15%", textAlign: "right" }}>
+    Value (USD)
+  </span>
+
+</div>
+
+
+
 
     {showSkeleton && (
       <div className="positions-row">
@@ -1282,9 +1403,6 @@ const explorerTxUrl = walletAddress
           <span className="skeleton skeleton-sm" />
         </span>
         <span className="col-amount">
-          <span className="skeleton skeleton-sm" />
-        </span>
-        <span className="col-pnl">
           <span className="skeleton skeleton-sm" />
         </span>
         <span className="col-value">
@@ -1301,7 +1419,6 @@ const explorerTxUrl = walletAddress
           <span className="col-token">no yielding positions found</span>
           <span className="col-price"></span>
           <span className="col-amount"></span>
-          <span className="col-pnl"></span>
           <span className="col-value"></span>
         </div>
       )}
@@ -1337,38 +1454,184 @@ const explorerTxUrl = walletAddress
           (v.apy as number) ??
           0;
 
-        return (
-          <div className="positions-row" key={idx}>
-            <span className="col-token">{label}</span>
-            <span className="col-price">{platform}</span>
-            <span className="col-amount">
-              {amount ? amount.toFixed(4) : "-"}
-            </span>
-            <span className="col-pnl">
-              {apr ? `${apr.toFixed(2)}%` : "-"}
-            </span>
-            <span className="col-value">
-              {`$${depositedUsd.toFixed(2)}`}
-            </span>
-          </div>
-        );
+        
+return (
+  <div className="positions-row" key={idx}>
+
+    {/* PROTOCOL */}
+    <span className="col-token" style={{ width: "25%", display: "flex", alignItems: "center" }}>
+      {platform}
+    </span>
+
+    {/* POOL */}
+    <span className="col-token" style={{ width: "30%", minWidth: 0 }}>
+      {label}
+    </span>
+
+    {/* BALANCE */}
+    <span className="col-amount" style={{ width: "15%", textAlign: "center" }}>
+      {amount ? amount.toFixed(4) : "-"}
+    </span>
+
+    {/* REWARDS */}
+    <span className="col-amount" style={{ width: "15%", textAlign: "center" }}>
+      {apr ? `${apr.toFixed(2)}%` : "-"}
+    </span>
+
+    {/* VALUE */}
+    <span className="col-value" style={{ width: "15%", textAlign: "right" }}>
+      {`$${depositedUsd.toFixed(2)}`}
+    </span>
+
+  </div>
+);
       })}
   </div>
 )}
 
 
-  {/* TAB 3: NFTs placeholder */}
+
+{/* TAB 3: NFTs */}
 {positionsTab === "nfts" && (
-  <div className="positions-empty">
-    {walletAddress ? (
-      nftCount > 0 ? (
-        <p>{nftCount} NFTs detected for this wallet on ink</p>
-      ) : (
-        <p>no NFTs found yet for this wallet on ink</p>
-      )
-    ) : (
-      <p>enter a wallet above to check NFTs on ink</p>
-    )}
+  <div className="positions-table">
+
+
+    {/* header */}
+<div className="positions-row positions-row-head nft-head">
+
+  {/* COLLECTION */}
+  <span className="col-token nft-head-col" style={{ width: "67%" }}>
+    Collection
+  </span>
+
+  {/* spacer 1 */}
+  <span style={{ width: "1%" }}></span>
+
+  {/* BALANCE (sortable) */}
+<span
+  className="col-amount nft-head-col"
+  style={{
+    width: "15%",
+    display: "flex",
+    justifyContent: "center",
+  }}
+  onClick={() => handleNftSort("balance")}
+>
+
+
+    <span className="nft-sort-label">
+      Balance
+      <span className="nft-sort-arrow">
+        {nftSortBy === "balance"
+          ? nftSortDir === "asc" ? "▲" : "▼"
+          : "↕"}
+      </span>
+    </span>
+  </span>
+
+  {/* spacer 2 */}
+  <span style={{ width: "1%" }}></span>
+
+  {/* TOTAL SPENT */}
+<span
+  className="col-value nft-head-col"
+  style={{ width: "16%", textAlign: "right" }}
+  onClick={() => handleNftSort("spent")}
+>
+
+    <span className="nft-sort-label">
+      Total spent
+      <span className="nft-sort-arrow">
+        {nftSortBy === "spent"
+          ? nftSortDir === "asc" ? "▲" : "▼"
+          : "↕"}
+      </span>
+    </span>
+  </span>
+
+</div>
+
+
+    {/* rows */}
+{sortedNfts.map((col) => {
+  const firstToken = col.tokens[0];
+  return (
+    <div className="positions-row" key={col.address}>
+
+      {/* COLLECTION */}
+      <span
+        className="col-token"
+        style={{
+          width: "67%",
+          display: "flex",
+          alignItems: "center",
+          minWidth: 0,
+        }}
+      >
+        <span className="token-icon">
+          {firstToken?.imageUrl ? (
+            <img
+              src={firstToken.imageUrl}
+              className="token-icon-img"
+              alt={col.name}
+            />
+          ) : (
+            (col.symbol || "?").slice(0, 3).toUpperCase()
+          )}
+        </span>
+
+        <a
+          className="nft-collection-link"
+          href={`https://explorer.inkonchain.com/token/${col.address}?tab=holders`}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            marginLeft: 12,
+            flex: 1,
+            minWidth: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {col.name}
+        </a>
+      </span>
+
+      {/* spacer 1 */}
+      <span style={{ width: "1%" }}></span>
+
+      {/* BALANCE */}
+<span
+  className="col-amount"
+  style={{
+    width: "15%",
+    display: "flex",
+    justifyContent: "center",
+  }}
+>
+  {col.ownedCount || col.tokens.length}
+</span>
+
+
+
+      {/* spacer 2 */}
+      <span style={{ width: "1%" }}></span>
+
+      {/* TOTAL SPENT */}
+<span
+  className="col-value"
+  style={{ width: "16%", textAlign: "right" }}
+>
+  {perCollectionSpentUsd[col.address]
+    ? `$${perCollectionSpentUsd[col.address].toFixed(2)}`
+    : "-"}
+</span>
+
+
+    </div>
+  );
+})}
   </div>
 )}
 
