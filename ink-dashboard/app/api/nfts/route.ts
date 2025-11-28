@@ -49,7 +49,7 @@ async function fetchCollections(wallet: string) {
           contract: addr.toLowerCase(),
           tokenId: id,
           name: meta.name || `#${id}`,
-          imageUrl: img
+          imageUrl: img,
         }
       })
 
@@ -58,62 +58,12 @@ async function fetchCollections(wallet: string) {
         name: token.name || 'unknown collection',
         symbol: token.symbol || '',
         ownedCount: owned,
-        tokens
+        tokens,
       }
     })
   } catch (err) {
+    console.error('fetchCollections failed', err)
     return []
-  }
-}
-
-async function fetchTotalSpent(wallet: string) {
-  try {
-    const txRes = await fetch(
-      `${BLOCKSCOUT_BASE}/addresses/${wallet}/transactions?filter=token_transfer,erc721`
-    )
-    const json = await txRes.json()
-
-    let totalInk = 0
-    const perCol: Record<string, number> = {}
-
-    json.items.forEach((tx: any) => {
-      const incoming = tx.to?.hash?.toLowerCase() === wallet.toLowerCase()
-      const val = Number(tx.value || 0)
-
-      if (incoming && val > 0) {
-        const ink = val / 1e18
-        totalInk += ink
-
-        const addr =
-          tx.token?.contract?.address ||
-          tx.contract_address ||
-          tx.to?.hash
-
-        if (addr) {
-          const c = addr.toLowerCase()
-          perCol[c] = (perCol[c] || 0) + ink
-        }
-      }
-    })
-
-    const pRes = await fetch(`https://api.inkonchain.com/v1/price`)
-    const price = await pRes.json()
-    const usd = price.usd || 0
-
-    const perColUsd: Record<string, number> = {}
-    Object.keys(perCol).forEach(a => {
-      perColUsd[a] = perCol[a] * usd
-    })
-
-    return {
-      totalSpentUsd: totalInk * usd,
-      perCollectionSpentUsd: perColUsd
-    }
-  } catch (err) {
-    return {
-      totalSpentUsd: 0,
-      perCollectionSpentUsd: {}
-    }
   }
 }
 
@@ -126,12 +76,9 @@ export async function GET(req: Request) {
   }
 
   const collections = await fetchCollections(wallet)
-  const spent = await fetchTotalSpent(wallet)
 
   return NextResponse.json({
     address: wallet,
     collections,
-    totalSpentUsd: spent.totalSpentUsd,
-    perCollectionSpentUsd: spent.perCollectionSpentUsd
   })
 }

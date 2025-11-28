@@ -27,6 +27,7 @@ body {
   flex-direction: column;
 }
 
+
 /* header */
 
 .header {
@@ -124,7 +125,7 @@ body {
 background: #f3f4f6;
 border-color: #d1d5db;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   color: #0f172a;
 }
 
@@ -151,6 +152,33 @@ border-color: #d1d5db;
   justify-content: center;
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
   transition: all 0.15s ease;
+}
+
+/* premium connect wallet button */
+.connect-wallet-btn {
+  font-weight: 600;
+  background: linear-gradient(135deg, #a684ff, #7b5cff);
+  border: none;
+  color: #f9fafb;
+  box-shadow:
+    0 8px 18px rgba(123, 92, 255, 0.35),
+    0 0 0 1px rgba(166, 132, 255, 0.6);
+}
+
+.connect-wallet-btn:hover {
+  box-shadow:
+    0 10px 22px rgba(123, 92, 255, 0.45),
+    0 0 0 1px rgba(191, 164, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+/* dark theme version of the same button */
+body[data-theme="dark"] .connect-wallet-btn {
+  background: linear-gradient(135deg, #b493ff, #8a6bff);
+  color: #fdfcff;
+  box-shadow:
+    0 10px 26px rgba(79, 70, 229, 0.7),
+    0 0 0 1px rgba(186, 165, 255, 0.9);
 }
 
 .header-right button:hover {
@@ -2637,10 +2665,10 @@ body[data-theme='dark'] .last-updated-text {
 /* NFT Header Debank Style */
 .nft-head {
   background: var(--table-head-bg, rgba(0,0,0,0.02));
-  padding-top: 14px;
-  padding-bottom: 14px;
   border-radius: 12px 12px 0 0;
+  /* no padding here, it will use the shared 8px rule */
 }
+
 
 .nft-head-col {
   font-size: 13px;
@@ -2948,16 +2976,18 @@ body[data-theme='dark'] .stat-card::before {
 body[data-theme='dark'] .portfolio-header-card,
 body[data-theme='dark'] .stat-card {
   box-shadow:
-    0 0 14px rgba(119,93,255,0.25),
-    0 0 24px rgba(119,93,255,0.15);
+    0 0 10px rgba(119,93,255,0.20),
+    0 0 18px rgba(0,0,0,0.85);
 }
+
 
 body[data-theme='light'] .portfolio-header-card,
 body[data-theme='light'] .stat-card {
   box-shadow:
-    0 0 10px rgba(119,93,255,0.15),
-    0 0 18px rgba(119,93,255,0.08);
+    0 0 8px rgba(119,93,255,0.14),
+    0 0 14px rgba(119,93,255,0.06);
 }
+
 
 /* REMOVE GLOW FROM TABLES */
 .positions-table::before {
@@ -3285,4 +3315,179 @@ body[data-theme="dark"] .header-right button {
 }
 body[data-theme="dark"] .header-right button:hover {
   background: #1a2336;
+}
+
+body,
+.header-center input,
+.header-right button,
+.theme-toggle-btn,
+.portfolio-header-card,
+.stat-card,
+.positions-table,
+.sidebar,
+.header,
+.main {
+  transition:
+    background 0.25s ease,
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+
+/* FINAL header normalization for all tables */
+.positions-table .positions-row-head {
+  padding-top: 13px !important;
+  padding-bottom: 13px !important;
+}
+
+/* keep all header labels on one line */
+.positions-row-head span,
+.positions-row-head .nft-sort-label {
+  white-space: nowrap;
+}
+
+/* force NFT header to visually match wallet header */
+.nft-head-col {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+}
+
+.tx-token-dropdown {
+  opacity: 0;
+  transform: translateY(6px);
+  animation: txTokenDropdownFade 0.16s ease-out forwards;
+}
+
+@keyframes txTokenDropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* transactions table header fix */
+.tx-table .tx-row-head {
+  padding-top: 13px !important;
+  padding-bottom: 13px !important;
+}
+
+.tx-table .tx-row-head span {
+  white-space: nowrap;
+}
+
+/* transactions table layout: 6 columns */
+.tx-table .positions-row {
+  display: grid;
+  grid-template-columns: 2.4fr 0.9fr 1.2fr 1.0fr 1.4fr 1.1fr;
+}
+
+/* header padding + keep labels on one line */
+.tx-table .tx-row-head {
+  padding-top: 13px !important;
+  padding-bottom: 13px !important;
+}
+
+.tx-table .tx-row-head span {
+  white-space: nowrap;
+}
+
+/* 4-column premium DeBank-style layout */
+.tx-table .positions-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr 1fr;
+  align-items: center;
+  padding: 14px 0;
+}
+
+/* header alignment */
+.tx-row-head span {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+/* hash link */
+.tx-hash {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* type + details */
+.tx-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* token movement pills */
+.tx-moves {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tx-move-pill {
+  background: rgba(148,152,161,0.12);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  backdrop-filter: blur(6px);
+}
+
+.fee-usd {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* debank style 4-column tx table */
+.tx-table .positions-row {
+  display: grid;
+  grid-template-columns: 2.1fr 1fr 2.2fr 1.2fr;
+  align-items: center;
+}
+
+/* header */
+.tx-table .tx-row-head span {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+/* date + hash */
+.tx-hash {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* type column */
+.tx-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tx-moves {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tx-move-pill {
+  background: rgba(148, 152, 161, 0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  backdrop-filter: blur(6px);
+}
+
+/* fee column */
+.fee-usd {
+  font-size: 11px;
+  opacity: 0.7;
 }

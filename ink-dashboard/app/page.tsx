@@ -118,6 +118,28 @@ type NftCollection = {
   tokens: NftToken[];
 };
 
+type TxToken = {
+  symbol: string;
+  address: string;
+};
+
+type TxItem = {
+  hash: string;
+  timestamp: number;
+  direction: "in" | "out" | "self";
+  from: string;
+  to: string;
+  otherParty: string;
+  valueInk: number;
+  gasFeeInk: number;
+  gasFeeUsd: number;
+  details: string;
+  hasNft: boolean;
+  status: string;
+  tokens: TxToken[];
+};
+
+
 function isSpamToken(t: TokenHolding): boolean {
   const price = t.priceUsd ?? 0;
   const value = t.valueUsd ?? price * t.balance;
@@ -242,14 +264,33 @@ export default function HomePage() {
   const [positionsTab, setPositionsTab] = useState<PositionsTab>("wallet");
   const showSkeleton = isLoadingPortfolio && !portfolio;
 
-  const [nftCollections, setNftCollections] = useState<NftCollection[] | null>(
-    null
-  );
-const [perCollectionSpentUsd, setPerCollectionSpentUsd] = useState<Record<string, number>>({});
-  const [isLoadingNfts, setIsLoadingNfts] = useState(false);
-  const [nftError, setNftError] = useState<string | null>(null);
+const [nftCollections, setNftCollections] = useState<NftCollection[] | null>(
+  null
+);
+const [perCollectionSpentUsd, setPerCollectionSpentUsd] =
+  useState<Record<string, number>>({});
+const [perCollectionFloorUsd, setPerCollectionFloorUsd] =
+  useState<Record<string, number>>({});
+
+// total spent across all collections (for later if you want to display it)
+const [totalNftSpentUsd, setTotalNftSpentUsd] = useState<number>(0);
+
+const [isLoadingNfts, setIsLoadingNfts] = useState(false);
+const [nftError, setNftError] = useState<string | null>(null);
 const [nftSortBy, setNftSortBy] = useState<"balance" | "spent" | null>(null);
 const [nftSortDir, setNftSortDir] = useState<"asc" | "desc">("desc");
+
+ // transactions consts
+const [txs, setTxs] = useState<TxItem[]>([]);
+const [isLoadingTxs, setIsLoadingTxs] = useState(false);
+const [txError, setTxError] = useState<string | null>(null);
+const [txTokenQuery, setTxTokenQuery] = useState<string>("");
+const [txSelectedToken, setTxSelectedToken] = useState<TxToken | null>(null);
+const [txPage, setTxPage] = useState(1);
+const [txHasMore, setTxHasMore] = useState(false);
+const [txTokenDropdownOpen, setTxTokenDropdownOpen] = useState(false);
+
+const [txTokenOptions, setTxTokenOptions] = useState<TxToken[]>([]);
 
 
 // try to get token icon from backend that proxies Dexscreener
@@ -366,7 +407,9 @@ if (data?.tokens?.length) {
 
     // NFTS function
 
-    const loadNfts = async (addr: string) => {
+  // NFTS function
+
+  const loadNfts = async (addr: string) => {
     if (!addr) return;
 
     try {
@@ -382,9 +425,6 @@ if (data?.tokens?.length) {
         : [];
 
       setNftCollections(cols);
-      if (json.perCollectionSpentUsd) {
-  setPerCollectionSpentUsd(json.perCollectionSpentUsd);
-}
     } catch (err) {
       console.error("nfts fetch failed", err);
       setNftError("could not load nfts");
@@ -394,14 +434,121 @@ if (data?.tokens?.length) {
     }
   };
 
-  // when wallet changes, load portfolio and default history
-  useEffect(() => {
-    if (!walletAddress) return;
 
-    loadPortfolio(walletAddress);
-    loadHistory(walletAddress, historyRange);
-    loadNfts(walletAddress);
-  }, [walletAddress]);
+    // total spent per collection is loaded from a separate endpoint
+  const loadNftSpent = async (addr: string) => {
+    if (!addr) return;
+
+    try {
+      const res = await fetch(`/api/nfts/spent?wallet=${addr}`);
+      if (!res.ok) {
+        console.error("nfts spent fetch failed", res.status);
+        return;
+      }
+
+      const json = await res.json();
+
+      const total = Number(json.totalSpentUsd || 0);
+      const perCol = (json.perCollectionSpentUsd || {}) as Record<
+        string,
+        number
+      >;
+
+      setTotalNftSpentUsd(total);
+      setPerCollectionSpentUsd(perCol);
+    } catch (err) {
+      console.error("nfts spent fetch crashed", err);
+    }
+  };
+
+  // transaction function
+
+const loadTransactions = async (addr: string, page: number) => {
+  if (!addr) return;
+
+  try {
+    setIsLoadingTxs(true);
+    setTxError(null);
+
+    const params = new URLSearchParams();
+    params.set('wallet', addr);
+    params.set('page', String(page));
+
+    const tokenAddr = txSelectedToken?.address?.toLowerCase();
+    if (tokenAddr) {
+      params.set('token', tokenAddr);
+    }
+
+    const res = await fetch(`/api/transactions?${params.toString()}`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+
+    const json = await res.json();
+    const list: TxItem[] = Array.isArray(json.txs) ? json.txs : [];
+
+    setTxHasMore(!!json.hasMore);
+
+    setTxs(prev =>
+      page === 1 ? list : [...prev, ...list]
+    );
+
+    // NEW: use backend tokens as global token list
+    if (Array.isArray(json.tokens)) {
+      setTxTokenOptions(prev => {
+        const map: Record<string, TxToken> = {};
+
+        for (const t of [...prev, ...json.tokens]) {
+          if (!t.address) continue;
+          const addrKey = t.address.toLowerCase();
+          if (!map[addrKey]) {
+            map[addrKey] = {
+              symbol: t.symbol,
+              address: addrKey,
+            };
+          }
+        }
+
+        return Object.values(map);
+      });
+    }
+  } catch (e) {
+    console.error('loadTransactions failed', e);
+    setTxError('could not load transactions');
+  } finally {
+    setIsLoadingTxs(false);
+  }
+};
+
+
+
+
+
+// when wallet changes, reset tx paging and load base data
+useEffect(() => {
+  if (!walletAddress) return;
+
+  setTxPage(1);
+  setTxHasMore(false);
+  setTxs([]); // clear old txs when switching wallet
+  setTxTokenQuery('');
+  setTxSelectedToken(null);
+  setTxTokenDropdownOpen(false);
+  setTxTokenOptions([]); // NEW reset token list
+
+
+  loadPortfolio(walletAddress);
+  loadHistory(walletAddress, historyRange);
+  loadNfts(walletAddress);
+  loadNftSpent(walletAddress);
+  // do not call loadTransactions here
+}, [walletAddress]);
+
+
+// whenever wallet, page, or selected token changes, load tx page
+useEffect(() => {
+  if (!walletAddress) return;
+  loadTransactions(walletAddress, txPage);
+}, [walletAddress, txPage, txSelectedToken]);
+
 
 
   // when range changes, reload history only
@@ -609,6 +756,44 @@ const explorerTxUrl = walletAddress
   ? `https://explorer.inkonchain.com/address/${walletAddress}?tab=txs`
   : null;
 
+// all unique tokens from transactions
+
+
+  // fetch icons for tokens seen in transactions as well
+  useEffect(() => {
+    txTokenOptions.forEach((tok) => {
+      if (!tok.address) return;
+      if (tokenIcons[tok.address]) return;
+      fetchDexIcon(tok.address);
+    });
+  }, [txTokenOptions, tokenIcons]);
+
+// suggestions based on query
+const txTokenSuggestions = useMemo(() => {
+  const q = txTokenQuery.trim().toLowerCase();
+  if (!q) return txTokenOptions;
+
+  return txTokenOptions.filter((tok) => {
+    const sym = (tok.symbol || "").toLowerCase();
+    const addr = (tok.address || "").toLowerCase();
+    return sym.includes(q) || addr.includes(q);
+  });
+}, [txTokenOptions, txTokenQuery]);
+
+// final filtered transactions
+const filteredTxs = useMemo(() => {
+  if (!txSelectedToken) return txs;
+
+  const target = txSelectedToken.address.toLowerCase();
+  return txs.filter((tx) =>
+    (tx.tokens || []).some(
+      (tok) => tok.address && tok.address.toLowerCase() === target
+    )
+  );
+}, [txs, txSelectedToken]);
+
+
+
   return (
     <>
       {/* top header */}
@@ -645,15 +830,21 @@ const explorerTxUrl = walletAddress
               placeholder="Search Address or .INK Domain"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const trimmed = searchInput.trim();
-                  if (!trimmed) return;
-                  setWalletAddress(trimmed);
-                  setNetWorthHistory([]);
-                  setHoverIndex(null);
-                }
-              }}
+onKeyDown={(e) => {
+  if (e.key === 'Enter') {
+    const raw = (e.currentTarget as HTMLInputElement).value;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+
+    // keep local state in sync
+    setSearchInput(trimmed);
+
+    // trigger portfolio reload for the pasted address
+    setWalletAddress(trimmed);
+    setNetWorthHistory([]);
+    setHoverIndex(null);
+  }
+}}
             />
           </div>
         </div>
@@ -667,7 +858,10 @@ const explorerTxUrl = walletAddress
             {theme === "light" ? "☾" : "☀"}
           </button>
 
-          <button>connect wallet</button>
+          <button className="connect-wallet-btn">
+  connect wallet
+</button>
+
         </div>
       </header>
 
@@ -1504,171 +1698,572 @@ return (
 
 
 {/* TAB 3: NFTs */}
-{positionsTab === "nfts" && (
-  <div className="positions-table">
+{positionsTab === 'nfts' && (
+  <div className='positions-table nft-table'>
 
 
     {/* header */}
-<div className="positions-row positions-row-head nft-head">
-
-  {/* COLLECTION */}
-  <span className="col-token nft-head-col" style={{ width: "67%" }}>
+<div className='positions-row positions-row-head nft-head'>
+  {/* 1. collection */}
+  <span className='col-token nft-head-col'>
     Collection
   </span>
 
-  {/* spacer 1 */}
-  <span style={{ width: "1%" }}></span>
+  {/* 2. spacer */}
+  <span />
 
-  {/* BALANCE (sortable) */}
-<span
-  className="col-amount nft-head-col"
-  style={{
-    width: "15%",
-    display: "flex",
-    justifyContent: "center",
-  }}
-  onClick={() => handleNftSort("balance")}
->
-
-
-    <span className="nft-sort-label">
+  {/* 3. balance (sortable) */}
+  <span
+    className='col-amount nft-head-col'
+    style={{ display: 'flex', justifyContent: 'center' }}
+    onClick={() => handleNftSort('balance')}
+  >
+    <span className='nft-sort-label'>
       Balance
-      <span className="nft-sort-arrow">
-        {nftSortBy === "balance"
-          ? nftSortDir === "asc" ? "▲" : "▼"
-          : "↕"}
+      <span className='nft-sort-arrow'>
+        {nftSortBy === 'balance'
+          ? nftSortDir === 'asc'
+            ? '▲'
+            : '▼'
+          : '↕'}
       </span>
     </span>
   </span>
 
-  {/* spacer 2 */}
-  <span style={{ width: "1%" }}></span>
-
-  {/* TOTAL SPENT */}
-<span
-  className="col-value nft-head-col"
-  style={{ width: "16%", textAlign: "right" }}
-  onClick={() => handleNftSort("spent")}
->
-
-    <span className="nft-sort-label">
+  {/* 4. total spent (sortable) */}
+  <span
+    className='col-value nft-head-col'
+    style={{ textAlign: 'right' }}
+    onClick={() => handleNftSort('spent')}
+  >
+    <span className='nft-sort-label'>
       Total spent
-      <span className="nft-sort-arrow">
-        {nftSortBy === "spent"
-          ? nftSortDir === "asc" ? "▲" : "▼"
-          : "↕"}
+      <span className='nft-sort-arrow'>
+        {nftSortBy === 'spent'
+          ? nftSortDir === 'asc'
+            ? '▲'
+            : '▼'
+          : '↕'}
       </span>
     </span>
   </span>
 
+  {/* 5. floor */}
+  <span
+    className='col-value nft-head-col'
+    style={{ textAlign: 'right' }}
+  >
+    Floor (USD)
+  </span>
 </div>
 
 
     {/* rows */}
-{sortedNfts.map((col) => {
+{sortedNfts.map(col => {
   const firstToken = col.tokens[0];
-  return (
-    <div className="positions-row" key={col.address}>
 
-      {/* COLLECTION */}
+  return (
+    <div className='positions-row' key={col.address}>
+      {/* 1. collection */}
       <span
-        className="col-token"
+        className='col-token'
         style={{
-          width: "67%",
-          display: "flex",
-          alignItems: "center",
+          display: 'flex',
+          alignItems: 'center',
           minWidth: 0,
         }}
       >
-        <span className="token-icon">
+        <span className='token-icon'>
           {firstToken?.imageUrl ? (
             <img
               src={firstToken.imageUrl}
-              className="token-icon-img"
+              className='token-icon-img'
               alt={col.name}
             />
           ) : (
-            (col.symbol || "?").slice(0, 3).toUpperCase()
+            (col.symbol || '?').slice(0, 3).toUpperCase()
           )}
         </span>
 
         <a
-          className="nft-collection-link"
+          className='nft-collection-link'
           href={`https://explorer.inkonchain.com/token/${col.address}?tab=holders`}
-          target="_blank"
-          rel="noreferrer"
+          target='_blank'
+          rel='noreferrer'
           style={{
             marginLeft: 12,
             flex: 1,
             minWidth: 0,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
           {col.name}
         </a>
       </span>
 
-      {/* spacer 1 */}
-      <span style={{ width: "1%" }}></span>
+      {/* 2. spacer */}
+      <span />
 
-      {/* BALANCE */}
+      {/* 3. balance */}
+      <span
+        className='col-amount'
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+        }}
+      >
+        {col.ownedCount || col.tokens.length}
+      </span>
+
+      {/* 4. total spent */}
 <span
-  className="col-amount"
-  style={{
-    width: "15%",
-    display: "flex",
-    justifyContent: "center",
-  }}
+  className='col-value'
+  style={{ textAlign: 'right' }}
 >
-  {col.ownedCount || col.tokens.length}
+  {(() => {
+    const key = (col.address || '').toLowerCase()
+    const spent = perCollectionSpentUsd[key]
+    return spent != null && spent > 0
+      ? `$${spent.toFixed(2)}`
+      : '-'
+  })()}
 </span>
 
 
 
-      {/* spacer 2 */}
-      <span style={{ width: "1%" }}></span>
-
-      {/* TOTAL SPENT */}
-<span
-  className="col-value"
-  style={{ width: "16%", textAlign: "right" }}
->
-  {perCollectionSpentUsd[col.address]
-    ? `$${perCollectionSpentUsd[col.address].toFixed(2)}`
-    : "-"}
-</span>
-
-
+      {/* 5. floor value placeholder for now */}
+      <span
+        className='col-value'
+        style={{ textAlign: 'right' }}
+      >
+        -
+      </span>
     </div>
   );
 })}
+
   </div>
 )}
 
 
     {/* TAB 4: transactions placeholder */}
 {positionsTab === "transactions" && (
-  <div className="positions-empty">
-    {walletAddress && explorerTxUrl ? (
-      <p>
-        full transaction history for this wallet is on ink explorer{" "}
+  <div className="positions-table tx-table">
+    {/* debank style token picker */}
+    <div
+      className="search-wrapper"
+      style={{
+        marginBottom: 8,
+        maxWidth: 280,
+        position: "relative",
+      }}
+    >
+      <span className="search-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24">
+          <circle
+            cx="11"
+            cy="11"
+            r="7"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            fill="none"
+          />
+          <line
+            x1="16"
+            y1="16"
+            x2="21"
+            y2="21"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+
+      <input
+        placeholder={
+          txSelectedToken
+            ? `Filter by token: ${txSelectedToken.symbol}`
+            : "Filter by token or contract"
+        }
+        value={txTokenQuery}
+        onChange={(e) => {
+          setTxTokenQuery(e.target.value);
+          setTxSelectedToken(null);
+          setTxTokenDropdownOpen(true);
+        }}
+        onFocus={() => {
+          setTxTokenDropdownOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+
+            const q = txTokenQuery.trim().toLowerCase();
+            if (!q) return;
+
+            const match = txTokenOptions.find((tok) => {
+              const sym = (tok.symbol || "").toLowerCase();
+              const addr = (tok.address || "").toLowerCase();
+              return sym === q || addr === q;
+            });
+
+            if (match) {
+              setTxSelectedToken(match);
+              setTxTokenQuery(match.symbol || match.address);
+              setTxPage(1);
+              setTxs([]);
+              setTxHasMore(false);
+              setTxTokenDropdownOpen(false);
+            } else {
+              setTxTokenQuery("");
+              setTxSelectedToken(null);
+              setTxPage(1);
+              setTxs([]);
+              setTxHasMore(false);
+              setTxTokenDropdownOpen(false);
+            }
+          }
+        }}
+        onBlur={() => {
+          setTimeout(() => {
+            setTxTokenDropdownOpen(false);
+
+            const q = txTokenQuery.trim().toLowerCase();
+            if (!q) return;
+
+            const selAddr =
+              txSelectedToken?.address?.toLowerCase() || "";
+            const selSym =
+              (txSelectedToken?.symbol || "").toLowerCase();
+
+            const matchesSelected =
+              q === selAddr || q === selSym;
+
+            if (!matchesSelected) {
+              setTxTokenQuery("");
+              setTxSelectedToken(null);
+              setTxPage(1);
+              setTxs([]);
+              setTxHasMore(false);
+            }
+          }, 120);
+        }}
+      />
+
+      {/* clear button */}
+      {(txTokenQuery || txSelectedToken) && (
+        <button
+          type="button"
+          onClick={() => {
+            setTxTokenQuery("");
+            setTxSelectedToken(null);
+            setTxTokenDropdownOpen(false);
+            setTxPage(1);
+            setTxs([]);
+            setTxHasMore(false);
+          }}
+          style={{
+            position: "absolute",
+            right: 10,
+            top: "50%",
+            transform: "translateY(-50%)",
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            fontSize: 14,
+            opacity: 0.7,
+          }}
+        >
+          ×
+        </button>
+      )}
+
+      {/* dropdown suggestions */}
+      {txTokenDropdownOpen && txTokenSuggestions.length > 0 && (
+        <div
+          className="tx-token-dropdown"
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            marginTop: 4,
+            borderRadius: 12,
+            padding: 4,
+            background: "var(--card-bg, rgba(10, 12, 20, 0.98))",
+            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
+            maxHeight: 260,
+            overflowY: "auto",
+            zIndex: 20,
+          }}
+        >
+          {txTokenSuggestions.map((tok) => (
+            <button
+              key={tok.address}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setTxSelectedToken(tok);
+                setTxTokenQuery(tok.symbol);
+                setTxTokenDropdownOpen(false);
+                setTxPage(1);
+                setTxs([]);
+                setTxHasMore(false);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                border: "none",
+                background: "transparent",
+                padding: "6px 8px",
+                borderRadius: 10,
+                cursor: "pointer",
+              }}
+            >
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "999px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  marginRight: 8,
+                  background:
+                    "linear-gradient(135deg, #6b5bff, #ff5bd5)",
+                  color: "white",
+                  overflow: "hidden",
+                }}
+              >
+                {tokenIcons[tok.address] ? (
+                  <img
+                    src={tokenIcons[tok.address]}
+                    alt={tok.symbol || "token"}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  (tok.symbol || "?").slice(0, 1).toUpperCase()
+                )}
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  textAlign: "left",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {tok.symbol || "Token"}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.7,
+                  }}
+                >
+                  {tok.address
+                    ? `${tok.address.slice(0, 6)}...${tok.address.slice(
+                        -4
+                      )}`
+                    : ""}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* header row - only once now */}
+<div className="positions-row positions-row-head tx-row-head nft-head">
+<div className="positions-row positions-row-head tx-row-head">
+  <span className="col-a">Date / Hash</span>
+  <span className="col-b">Platform</span>
+  <span className="col-c">Type</span>
+  <span className="col-d" style={{ textAlign: "right" }}>Fee</span>
+</div>
+
+    </div>
+
+    {/* loading row, only for very first load when there are no txs yet */}
+    {isLoadingTxs && filteredTxs.length === 0 && (
+      <div className="positions-row">
+        <span className="col-token">
+          <span className="skeleton skeleton-md" />
+        </span>
+        <span className="col-amount">
+          <span className="skeleton skeleton-sm" />
+        </span>
+        <span className="col-amount">
+          <span className="skeleton skeleton-sm" />
+        </span>
+        <span className="col-amount">
+          <span className="skeleton skeleton-sm" />
+        </span>
+        <span className="col-token">
+          <span className="skeleton skeleton-sm" />
+        </span>
+        <span className="col-value">
+          <span className="skeleton skeleton-sm" />
+        </span>
+      </div>
+    )}
+
+    {/* error row */}
+    {txError && !isLoadingTxs && (
+      <div className="positions-row positions-row-empty">
+        <span className="col-token">{txError}</span>
+        <span className="col-amount"></span>
+        <span className="col-amount"></span>
+        <span className="col-amount"></span>
+        <span className="col-token"></span>
+        <span className="col-value"></span>
+      </div>
+    )}
+
+    {/* empty state */}
+    {!isLoadingTxs &&
+      !txError &&
+      walletAddress &&
+      filteredTxs.length === 0 && (
+        <div className="positions-row positions-row-empty">
+          <span className="col-token">no transactions found</span>
+          <span className="col-amount"></span>
+          <span className="col-amount"></span>
+          <span className="col-amount"></span>
+          <span className="col-token"></span>
+          <span className="col-value"></span>
+        </div>
+      )}
+
+    {/* rows */}
+{filteredTxs.map((tx) => {
+  const platform =
+    tx.details?.toLowerCase().includes("swap") ? "inkySwap" :
+    tx.details?.toLowerCase().includes("super") ? "SuperSwap" :
+    tx.details?.toLowerCase().includes("approve") ? "Approval" :
+    "Contract";
+
+  return (
+    <div className="positions-row tx-row" key={tx.hash}>
+      
+      {/* 1. Date + Hash */}
+      <span className="col-a">
+        <div>{formatDateTimeLabel(tx.timestamp)}</div>
         <a
-          className="asset-pill asset-pill-link"
-          href={explorerTxUrl}
+          href={`https://explorer.inkonchain.com/tx/${tx.hash}`}
           target="_blank"
           rel="noreferrer"
+          className="tx-hash"
         >
-          open explorer
+          {formatAddress(tx.hash)}
         </a>
-      </p>
-    ) : (
-      <p>enter a wallet above to see transactions</p>
+      </span>
+
+      {/* 2. Platform */}
+      <span className="col-b">
+        {platform}
+      </span>
+
+      {/* 3. Type + token movements */}
+      <span className="col-c">
+        <div className="tx-title">{tx.details}</div>
+
+        {/* token in/out */}
+        <div className="tx-moves">
+          {tx.tokens.slice(0, 3).map((tok) => (
+            <div key={tok.address} className="tx-move-pill">
+              {tok.symbol}
+            </div>
+          ))}
+        </div>
+      </span>
+
+      {/* 4. Fee */}
+      <span className="col-d" style={{ textAlign: "right" }}>
+        {tx.gasFeeInk ? (
+          <>
+            <div>{tx.gasFeeInk.toFixed(6)} INK</div>
+            <div className="fee-usd">
+              {`$${tx.gasFeeUsd.toFixed(4)}`}
+            </div>
+          </>
+        ) : "-"}
+      </span>
+
+    </div>
+  );
+})}
+ 
+
+    {isLoadingTxs && filteredTxs.length > 0 && (
+      <div
+        className="positions-row positions-row-empty"
+        style={{
+          justifyContent: "center",
+          fontSize: 12,
+          opacity: 0.7,
+        }}
+      >
+        loading more...
+      </div>
+    )}
+
+    {txHasMore && walletAddress && (
+      <div
+        className="positions-row positions-row-empty"
+        style={{ justifyContent: "center" }}
+      >
+        <button
+          className="wallet-action-btn"
+          disabled={isLoadingTxs}
+          onClick={() => setTxPage((prev) => prev + 1)}
+        >
+          {isLoadingTxs ? "loading..." : "load more"}
+        </button>
+      </div>
+    )}
+
+    {explorerTxUrl && (
+      <div
+        className="positions-row positions-row-empty"
+        style={{ marginTop: 12 }}
+      >
+        <span className="col-token">
+          full transaction history for this wallet is on ink explorer{" "}
+          <a
+            className="asset-pill asset-pill-link"
+            href={explorerTxUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            open explorer
+          </a>
+        </span>
+        <span className="col-amount"></span>
+        <span className="col-amount"></span>
+        <span className="col-amount"></span>
+        <span className="col-token"></span>
+        <span className="col-value"></span>
+      </div>
     )}
   </div>
 )}
-
 
 </section>
           </div>
