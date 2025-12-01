@@ -291,6 +291,7 @@ const [txHasMore, setTxHasMore] = useState(false);
 const [txTokenDropdownOpen, setTxTokenDropdownOpen] = useState(false);
 
 const [txTokenOptions, setTxTokenOptions] = useState<TxToken[]>([]);
+const [txCompact, setTxCompact] = useState(false);
 
 
 // try to get token icon from backend that proxies Dexscreener
@@ -463,6 +464,7 @@ if (data?.tokens?.length) {
 
   // transaction function
 
+// transaction function
 const loadTransactions = async (addr: string, page: number) => {
   if (!addr) return;
 
@@ -474,12 +476,14 @@ const loadTransactions = async (addr: string, page: number) => {
     params.set('wallet', addr);
     params.set('page', String(page));
 
+    // restore backend token filter
     const tokenAddr = txSelectedToken?.address?.toLowerCase();
     if (tokenAddr) {
       params.set('token', tokenAddr);
     }
 
     const res = await fetch(`/api/transactions?${params.toString()}`);
+
     if (!res.ok) throw new Error(`status ${res.status}`);
 
     const json = await res.json();
@@ -487,11 +491,8 @@ const loadTransactions = async (addr: string, page: number) => {
 
     setTxHasMore(!!json.hasMore);
 
-    setTxs(prev =>
-      page === 1 ? list : [...prev, ...list]
-    );
+    setTxs(prev => (page === 1 ? list : [...prev, ...list]));
 
-    // NEW: use backend tokens as global token list
     if (Array.isArray(json.tokens)) {
       setTxTokenOptions(prev => {
         const map: Record<string, TxToken> = {};
@@ -522,25 +523,55 @@ const loadTransactions = async (addr: string, page: number) => {
 
 
 
-// when wallet changes, reset tx paging and load base data
+const refreshTransactions = () => {
+  if (!walletAddress) return;
+
+  // reset paging and list, then reload page 1
+  setTxPage(1);
+  setTxHasMore(false);
+  setTxs([]);
+
+  loadTransactions(walletAddress, 1);
+};
+
+
+
+
+// when wallet changes, reset tx state and hydrate from cache if present
 useEffect(() => {
   if (!walletAddress) return;
 
   setTxPage(1);
   setTxHasMore(false);
-  setTxs([]); // clear old txs when switching wallet
   setTxTokenQuery('');
   setTxSelectedToken(null);
   setTxTokenDropdownOpen(false);
-  setTxTokenOptions([]); // NEW reset token list
+  setTxTokenOptions([]);
 
+  // try to load cached txs for this wallet
+  if (typeof window !== 'undefined') {
+    try {
+      const key = `inkdash_txs_${walletAddress.toLowerCase()}`;
+      const raw = window.localStorage.getItem(key);
+      if (raw) {
+        const parsed: TxItem[] = JSON.parse(raw);
+        setTxs(parsed);
+      } else {
+        setTxs([]);
+      }
+    } catch {
+      setTxs([]);
+    }
+  } else {
+    setTxs([]);
+  }
 
   loadPortfolio(walletAddress);
   loadHistory(walletAddress, historyRange);
   loadNfts(walletAddress);
   loadNftSpent(walletAddress);
-  // do not call loadTransactions here
 }, [walletAddress]);
+
 
 
 // whenever wallet, page, or selected token changes, load tx page
@@ -548,6 +579,10 @@ useEffect(() => {
   if (!walletAddress) return;
   loadTransactions(walletAddress, txPage);
 }, [walletAddress, txPage, txSelectedToken]);
+
+
+
+
 
 
 
@@ -771,7 +806,9 @@ const explorerTxUrl = walletAddress
 // suggestions based on query
 const txTokenSuggestions = useMemo(() => {
   const q = txTokenQuery.trim().toLowerCase();
-  if (!q) return txTokenOptions;
+
+  // no typing = no dropdown items
+  if (!q) return [];
 
   return txTokenOptions.filter((tok) => {
     const sym = (tok.symbol || "").toLowerCase();
@@ -780,18 +817,20 @@ const txTokenSuggestions = useMemo(() => {
   });
 }, [txTokenOptions, txTokenQuery]);
 
+
 // final filtered transactions
 const filteredTxs = useMemo(() => {
   if (!txSelectedToken) return txs;
 
   const target = txSelectedToken.address.toLowerCase();
-  return txs.filter((tx) =>
+  return txs.filter(tx =>
     (tx.tokens || []).some(
-      (tok) => tok.address && tok.address.toLowerCase() === target
+      tok => tok.address && tok.address.toLowerCase() === target
     )
   );
 }, [txs, txSelectedToken]);
 
+const showTxFullLoader = isLoadingTxs && txPage === 1;
 
 
   return (
@@ -1568,7 +1607,7 @@ const value = t.valueUsd ?? price * t.balance
   {/* TAB 2: yielding pools placeholder */}
 {positionsTab === "yielding" && (
   <div className="positions-table">
-<div className="positions-row positions-row-head nft-head">
+<div className="positions-row positions-row-head tx-row-head nft-head">
 
   {/* PROTOCOL */}
   <span className="col-token nft-head-col" style={{ width: "25%" }}>
@@ -1848,10 +1887,35 @@ return (
 )}
 
 
-    {/* TAB 4: transactions placeholder */}
+    {/* TAB 4: transactions */}
 {positionsTab === "transactions" && (
-  <div className="positions-table tx-table">
-    {/* debank style token picker */}
+  <div
+    className={`positions-table tx-table ${
+      txCompact ? "tx-compact" : ""
+    }`}
+  >
+
+    {/* toolbar */}
+    <div className="tx-toolbar">
+      <button
+        type="button"
+        className={`tx-compact-toggle ${txCompact ? "on" : ""}`}
+        onClick={() => setTxCompact((prev) => !prev)}
+      >
+        compact mode
+      </button>
+
+      <button
+        type="button"
+        className="tx-refresh-btn"
+        onClick={refreshTransactions}
+        disabled={isLoadingTxs || !walletAddress}
+      >
+        refresh transactions
+      </button>
+    </div>
+
+    {/* filter input */}
     <div
       className="search-wrapper"
       style={{
@@ -1891,69 +1955,19 @@ return (
         value={txTokenQuery}
         onChange={(e) => {
           setTxTokenQuery(e.target.value);
-          setTxSelectedToken(null);
           setTxTokenDropdownOpen(true);
         }}
         onFocus={() => {
-          setTxTokenDropdownOpen(true);
+          if (txTokenQuery.trim()) setTxTokenDropdownOpen(true);
         }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-
-            const q = txTokenQuery.trim().toLowerCase();
-            if (!q) return;
-
-            const match = txTokenOptions.find((tok) => {
-              const sym = (tok.symbol || "").toLowerCase();
-              const addr = (tok.address || "").toLowerCase();
-              return sym === q || addr === q;
-            });
-
-            if (match) {
-              setTxSelectedToken(match);
-              setTxTokenQuery(match.symbol || match.address);
-              setTxPage(1);
-              setTxs([]);
-              setTxHasMore(false);
-              setTxTokenDropdownOpen(false);
-            } else {
-              setTxTokenQuery("");
-              setTxSelectedToken(null);
-              setTxPage(1);
-              setTxs([]);
-              setTxHasMore(false);
-              setTxTokenDropdownOpen(false);
-            }
-          }
+          if (e.key === "Enter") e.preventDefault();
         }}
         onBlur={() => {
-          setTimeout(() => {
-            setTxTokenDropdownOpen(false);
-
-            const q = txTokenQuery.trim().toLowerCase();
-            if (!q) return;
-
-            const selAddr =
-              txSelectedToken?.address?.toLowerCase() || "";
-            const selSym =
-              (txSelectedToken?.symbol || "").toLowerCase();
-
-            const matchesSelected =
-              q === selAddr || q === selSym;
-
-            if (!matchesSelected) {
-              setTxTokenQuery("");
-              setTxSelectedToken(null);
-              setTxPage(1);
-              setTxs([]);
-              setTxHasMore(false);
-            }
-          }, 120);
+          setTimeout(() => setTxTokenDropdownOpen(false), 120);
         }}
       />
 
-      {/* clear button */}
       {(txTokenQuery || txSelectedToken) && (
         <button
           type="button"
@@ -1962,8 +1976,6 @@ return (
             setTxSelectedToken(null);
             setTxTokenDropdownOpen(false);
             setTxPage(1);
-            setTxs([]);
-            setTxHasMore(false);
           }}
           style={{
             position: "absolute",
@@ -1981,106 +1993,38 @@ return (
         </button>
       )}
 
-      {/* dropdown suggestions */}
       {txTokenDropdownOpen && txTokenSuggestions.length > 0 && (
-        <div
-          className="tx-token-dropdown"
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            marginTop: 4,
-            borderRadius: 12,
-            padding: 4,
-            background: "var(--card-bg, rgba(10, 12, 20, 0.98))",
-            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
-            maxHeight: 260,
-            overflowY: "auto",
-            zIndex: 20,
-          }}
-        >
+        <div className="tx-token-dropdown">
           {txTokenSuggestions.map((tok) => (
             <button
               key={tok.address}
               type="button"
+              className="tx-token-item"
               onMouseDown={(e) => {
                 e.preventDefault();
                 setTxSelectedToken(tok);
-                setTxTokenQuery(tok.symbol);
+                setTxTokenQuery(tok.symbol || tok.address);
                 setTxTokenDropdownOpen(false);
                 setTxPage(1);
-                setTxs([]);
                 setTxHasMore(false);
               }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                width: "100%",
-                border: "none",
-                background: "transparent",
-                padding: "6px 8px",
-                borderRadius: 10,
-                cursor: "pointer",
-              }}
             >
-              <span
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "999px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 12,
-                  marginRight: 8,
-                  background:
-                    "linear-gradient(135deg, #6b5bff, #ff5bd5)",
-                  color: "white",
-                  overflow: "hidden",
-                }}
-              >
+              <span className="tx-token-avatar">
                 {tokenIcons[tok.address] ? (
                   <img
                     src={tokenIcons[tok.address]}
                     alt={tok.symbol || "token"}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
+                    className="tx-token-avatar-img"
                   />
                 ) : (
-                  (tok.symbol || "?").slice(0, 1).toUpperCase()
+                  (tok.symbol || "?")[0].toUpperCase()
                 )}
               </span>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  textAlign: "left",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {tok.symbol || "Token"}
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    opacity: 0.7,
-                  }}
-                >
-                  {tok.address
-                    ? `${tok.address.slice(0, 6)}...${tok.address.slice(
-                        -4
-                      )}`
-                    : ""}
+
+              <div className="tx-token-meta">
+                <span className="tx-token-symbol">{tok.symbol}</span>
+                <span className="tx-token-address">
+                  {tok.address.slice(0, 6)}...{tok.address.slice(-4)}
                 </span>
               </div>
             </button>
@@ -2089,178 +2033,108 @@ return (
       )}
     </div>
 
-    {/* header row - only once now */}
-<div className="positions-row positions-row-head tx-row-head nft-head">
-<div className="positions-row positions-row-head tx-row-head">
-  <span className="col-a">Date / Hash</span>
-  <span className="col-b">Platform</span>
-  <span className="col-c">Type</span>
-  <span className="col-d" style={{ textAlign: "right" }}>Fee</span>
-</div>
-
-    </div>
-
-    {/* loading row, only for very first load when there are no txs yet */}
-    {isLoadingTxs && filteredTxs.length === 0 && (
-      <div className="positions-row">
-        <span className="col-token">
-          <span className="skeleton skeleton-md" />
-        </span>
-        <span className="col-amount">
-          <span className="skeleton skeleton-sm" />
-        </span>
-        <span className="col-amount">
-          <span className="skeleton skeleton-sm" />
-        </span>
-        <span className="col-amount">
-          <span className="skeleton skeleton-sm" />
-        </span>
-        <span className="col-token">
-          <span className="skeleton skeleton-sm" />
-        </span>
-        <span className="col-value">
-          <span className="skeleton skeleton-sm" />
-        </span>
-      </div>
-    )}
-
-    {/* error row */}
-    {txError && !isLoadingTxs && (
-      <div className="positions-row positions-row-empty">
-        <span className="col-token">{txError}</span>
-        <span className="col-amount"></span>
-        <span className="col-amount"></span>
-        <span className="col-amount"></span>
-        <span className="col-token"></span>
-        <span className="col-value"></span>
-      </div>
-    )}
-
-    {/* empty state */}
-    {!isLoadingTxs &&
-      !txError &&
-      walletAddress &&
-      filteredTxs.length === 0 && (
-        <div className="positions-row positions-row-empty">
-          <span className="col-token">no transactions found</span>
-          <span className="col-amount"></span>
-          <span className="col-amount"></span>
-          <span className="col-amount"></span>
-          <span className="col-token"></span>
-          <span className="col-value"></span>
+    {/* FULL PAGE LOADER */}
+{showTxFullLoader ? (
+  <div className='tx-full-loader'>
+    <div className='tx-full-spinner' />
+  </div>
+) : (
+  <>
+        {/* header */}
+        <div className="positions-row positions-row-head tx-row-head">
+          <span className="col-a">Date / Hash</span>
+          <span className="col-b">Platform</span>
+          <span className="col-c">Type</span>
+          <span className="col-d">Fee</span>
         </div>
-      )}
 
-    {/* rows */}
-{filteredTxs.map((tx) => {
-  const platform =
-    tx.details?.toLowerCase().includes("swap") ? "inkySwap" :
-    tx.details?.toLowerCase().includes("super") ? "SuperSwap" :
-    tx.details?.toLowerCase().includes("approve") ? "Approval" :
-    "Contract";
+        {/* error */}
+        {txError && (
+          <div className="positions-row positions-row-empty">
+            <span className="col-a">{txError}</span>
+            <span className="col-b"></span>
+            <span className="col-c"></span>
+            <span className="col-d"></span>
+          </div>
+        )}
 
-  return (
-    <div className="positions-row tx-row" key={tx.hash}>
-      
-      {/* 1. Date + Hash */}
-      <span className="col-a">
-        <div>{formatDateTimeLabel(tx.timestamp)}</div>
-        <a
-          href={`https://explorer.inkonchain.com/tx/${tx.hash}`}
-          target="_blank"
-          rel="noreferrer"
-          className="tx-hash"
-        >
-          {formatAddress(tx.hash)}
-        </a>
-      </span>
+        {/* empty */}
+        {!txError && walletAddress && filteredTxs.length === 0 && (
+          <div className="positions-row positions-row-empty">
+            <span className="col-a">no transactions found</span>
+            <span className="col-b"></span>
+            <span className="col-c"></span>
+            <span className="col-d"></span>
+          </div>
+        )}
 
-      {/* 2. Platform */}
-      <span className="col-b">
-        {platform}
-      </span>
+        {/* rows */}
+        {filteredTxs.map((tx) => {
+          const platform = tx.details?.toLowerCase().includes("swap")
+            ? "inkySwap"
+            : tx.details?.toLowerCase().includes("super")
+            ? "SuperSwap"
+            : "Contract";
 
-      {/* 3. Type + token movements */}
-      <span className="col-c">
-        <div className="tx-title">{tx.details}</div>
+          return (
+            <div className="positions-row tx-row" key={tx.hash}>
+              <span className="col-a">
+                <div>{formatDateTimeLabel(tx.timestamp)}</div>
+                <a
+                  href={`https://explorer.inkonchain.com/tx/${tx.hash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="tx-hash"
+                >
+                  {formatAddress(tx.hash)}
+                </a>
+              </span>
 
-        {/* token in/out */}
-        <div className="tx-moves">
-          {tx.tokens.slice(0, 3).map((tok) => (
-            <div key={tok.address} className="tx-move-pill">
-              {tok.symbol}
+              <span className="col-b">
+                <span className="tx-platform-pill">
+                  <span className="tx-platform-icon" />
+                  <span className="tx-platform-label">{platform}</span>
+                </span>
+              </span>
+
+              <span className="col-c">
+                <div className="tx-title">{tx.details}</div>
+                <div className="tx-moves">
+                  {tx.tokens.slice(0, 3).map((tok) => (
+                    <div key={tok.address} className="tx-move-pill">
+                      {tok.symbol}
+                    </div>
+                  ))}
+                </div>
+              </span>
+
+              <span className="col-d">
+                {tx.gasFeeInk?.toFixed(6) || "-"}
+                {tx.gasFeeUsd && (
+                  <div className="fee-usd">
+                    ${tx.gasFeeUsd.toFixed(4)}
+                  </div>
+                )}
+              </span>
             </div>
-          ))}
-        </div>
-      </span>
+          );
+        })}
 
-      {/* 4. Fee */}
-      <span className="col-d" style={{ textAlign: "right" }}>
-        {tx.gasFeeInk ? (
-          <>
-            <div>{tx.gasFeeInk.toFixed(6)} INK</div>
-            <div className="fee-usd">
-              {`$${tx.gasFeeUsd.toFixed(4)}`}
-            </div>
-          </>
-        ) : "-"}
-      </span>
-
-    </div>
-  );
-})}
- 
-
-    {isLoadingTxs && filteredTxs.length > 0 && (
-      <div
-        className="positions-row positions-row-empty"
-        style={{
-          justifyContent: "center",
-          fontSize: 12,
-          opacity: 0.7,
-        }}
-      >
-        loading more...
-      </div>
-    )}
-
-    {txHasMore && walletAddress && (
-      <div
-        className="positions-row positions-row-empty"
-        style={{ justifyContent: "center" }}
-      >
-        <button
-          className="wallet-action-btn"
-          disabled={isLoadingTxs}
-          onClick={() => setTxPage((prev) => prev + 1)}
-        >
-          {isLoadingTxs ? "loading..." : "load more"}
-        </button>
-      </div>
-    )}
-
-    {explorerTxUrl && (
-      <div
-        className="positions-row positions-row-empty"
-        style={{ marginTop: 12 }}
-      >
-        <span className="col-token">
-          full transaction history for this wallet is on ink explorer{" "}
-          <a
-            className="asset-pill asset-pill-link"
-            href={explorerTxUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            open explorer
-          </a>
-        </span>
-        <span className="col-amount"></span>
-        <span className="col-amount"></span>
-        <span className="col-amount"></span>
-        <span className="col-token"></span>
-        <span className="col-value"></span>
-      </div>
+{txHasMore && walletAddress && (
+  <div
+    className='positions-row positions-row-empty'
+    style={{ justifyContent: 'center' }}
+  >
+    <button
+      className='wallet-action-btn'
+      onClick={() => setTxPage(p => p + 1)}
+      disabled={isLoadingTxs}
+    >
+      {isLoadingTxs ? 'loading...' : 'load more'}
+    </button>
+  </div>
+)}
+      </>
     )}
   </div>
 )}
