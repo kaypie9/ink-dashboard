@@ -551,7 +551,7 @@ useEffect(() => {
 
 
 
-  // when range changes, reload history only
+  // when range changes, reload history onlyy
   useEffect(() => {
     if (!walletAddress) return;
     loadHistory(walletAddress, historyRange);
