@@ -23,7 +23,7 @@ const PLATFORM_ICONS: Record<string, string> = {
   '0x1d74317d760f2c72a94386f50e8d10f2c902b899': 'inkypump',
 
   // across
-  '': 'across',
+  '': '',
 
   // Nado
   '0x05ec92d78ed421f3d3ada77ffde167106565974e': 'Nado',
@@ -35,6 +35,7 @@ const PLATFORM_ICONS: Record<string, string> = {
 
     // dailygm
   '0x9f500d075118272b3564ac6ef2c70a9067fd2d3f': 'dailygm',
+
 }
 
 // svg footer - step style X icon
@@ -158,9 +159,14 @@ type TxItem = {
   hasNft: boolean;
   status: string;
   tokens: TxToken[];
-  method?: string;    // add this
-  toLabel?: string;   // keep this
+  method?: string;
+  toLabel?: string;
+
+  // new fields from "Called function XYZ on contract Foo"
+  primaryAppAddress?: string;
+  primaryAppLabel?: string;
 };
+
 
 
 function isSpamToken(t: TokenHolding): boolean {
@@ -195,6 +201,27 @@ function isSpamToken(t: TokenHolding): boolean {
   return false;
 }
 
+function isSpamSymbol(sym?: string): boolean {
+  if (!sym) return false
+  const s = sym.toLowerCase()
+
+  const looksLikeLink =
+    s.includes('http') ||
+    s.includes('.com') ||
+    s.includes('.org') ||
+    s.includes('.net') ||
+    s.includes('.io')
+
+  const looksLikeBot =
+    s.includes('bot') ||
+    s.includes('telegram') ||
+    s.includes('tg ') ||
+    s.includes('@')
+
+  const veryLongSymbol = s.length > 24
+
+  return looksLikeLink || looksLikeBot || veryLongSymbol
+}
 
 function shortAddress(addr: string) {
   if (!addr) return ''
@@ -270,11 +297,11 @@ function parseTxDetails(details: string | undefined): TxLeg[] {
 
   const legs: TxLeg[] = [];
 
-  // 1) normal tokens / native coin: "Sent 0.1 ANITA"
-  const re = /(Sent|Received)\s+([\d.,]+)\s+([A-Za-z0-9]+)\b/g;
+  // fungible tokens  Sent 0.1 ANITA
+  const reFungible = /(Sent|Received)\s+([\d.,]+)\s+([A-Za-z0-9]+)\b/g;
   let m: RegExpExecArray | null;
 
-  while ((m = re.exec(details)) !== null) {
+  while ((m = reFungible.exec(details)) !== null) {
     const dir = m[1] === "Sent" ? "out" : "in";
     const amt = parseFloat(m[2].replace(/,/g, ""));
     const sym = m[3];
@@ -285,22 +312,25 @@ function parseTxDetails(details: string | undefined): TxLeg[] {
     });
   }
 
-  // 2) NFTs: backend sends "Sent INKBunnies #1234"
-  // here we treat it as "+1 INKBunnies" (or "-1 INKBunnies")
-  const reNft = /(Sent|Received)\s+([A-Za-z0-9]+)\s+#\d+/g;
+  // nfts  Sent INKBunnies #1234  Received BOI #7
+  const reNft = /(Sent|Received)\s+([A-Za-z0-9]+)\s+#(\d+)/g;
 
   while ((m = reNft.exec(details)) !== null) {
     const dir = m[1] === "Sent" ? "out" : "in";
-    const sym = m[2];
+    const collection = m[2];
+    const id = m[3];
+
     legs.push({
       direction: dir,
       amount: 1,
-      symbol: sym,
+      symbol: `${collection} #${id}`,
     });
   }
 
   return legs;
 }
+
+
 
 
 export default function HomePage() {
@@ -394,6 +424,35 @@ const fetchDexIcon = async (address: string) => {
     console.error('token-icon api crashed', e);
   }
 };
+
+// fetch NFT icon from Blockscout
+const fetchNftIcon = async (address: string) => {
+  if (!address) return;
+
+  const key = address.toLowerCase();
+  if (tokenIcons[key]) return;
+
+  try {
+    const res = await fetch(
+      `/api/nft-icon?address=${encodeURIComponent(address)}`
+    );
+
+    if (!res.ok) {
+      console.error('nft-icon api failed', res.status);
+      return;
+    }
+
+    const data: { iconUrl?: string | null } = await res.json();
+    if (!data.iconUrl) return;
+
+    setTokenIcons(prev =>
+      prev[key] ? prev : { ...prev, [key]: data.iconUrl as string }
+    );
+  } catch (e) {
+    console.error('nft-icon api crashed', e);
+  }
+};
+
 
 
 // central fetcher used by both auto load and manual refresh
@@ -917,12 +976,20 @@ useEffect(() => {
   filteredTxs.forEach(tx => {
     tx.tokens.forEach(t => {
       const addr = t.address?.toLowerCase();
-      if (addr && !tokenIcons[addr]) {
+      if (!addr || tokenIcons[addr]) return;
+
+      const sym = (t.symbol || '').toUpperCase();
+      const isNft = sym.includes('#');
+
+      if (isNft) {
+        fetchNftIcon(addr);
+      } else {
         fetchDexIcon(addr);
       }
     });
   });
-}, [filteredTxs]);
+}, [filteredTxs, tokenIcons]);
+
 
 const showTxFullLoader = isLoadingTxs && txPage === 1;
 
@@ -963,22 +1030,36 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
               placeholder="Search Address or .INK Domain"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-onKeyDown={(e) => {
-  if (e.key === 'Enter') {
-    const raw = (e.currentTarget as HTMLInputElement).value;
-    const trimmed = raw.trim();
-    if (!trimmed) return;
+  onKeyDown={(e) => {
+    if (e.key === 'Enter') {
+      const raw = (e.currentTarget as HTMLInputElement).value;
+      const trimmed = raw.trim();
+      if (!trimmed) return;
 
-    // keep local state in sync
-    setSearchInput(trimmed);
+      // keep local state in sync
+      setSearchInput(trimmed);
 
-    // trigger portfolio reload for the pasted address
-    setWalletAddress(trimmed);
-    setNetWorthHistory([]);
-    setHoverIndex(null);
-  }
-}}
-            />
+      const sameWallet =
+        walletAddress &&
+        walletAddress.toLowerCase() === trimmed.toLowerCase();
+
+      if (sameWallet) {
+        // same address - force reload all data
+        setNetWorthHistory([]);
+        setHoverIndex(null);
+        loadPortfolio(trimmed);
+        loadHistory(trimmed, historyRange);
+        loadNfts(trimmed);
+        loadNftSpent(trimmed);
+      } else {
+        // new address - will trigger useEffect
+        setWalletAddress(trimmed);
+        setNetWorthHistory([]);
+        setHoverIndex(null);
+      }
+    }
+  }}
+/>
           </div>
         </div>
 
@@ -2155,6 +2236,10 @@ className="positions-table tx-table"
 {filteredTxs.map((tx) => {
 
   const legs = parseTxDetails(tx.details);
+  const isScamTx =
+    tx.tokens.length > 0 &&
+    tx.tokens.every(t => isSpamSymbol(t.symbol));
+
 
   const hasOut = legs.some((l) => l.direction === "out");
   const hasIn = legs.some((l) => l.direction === "in");
@@ -2177,19 +2262,30 @@ className="positions-table tx-table"
   let platformSub: string | null = null;
   let platformClass = "contract";
 
-    // prefer the explorer style "contract name" if we have it
+  // prefer the decoded primary app contract if backend sends it
+  const primaryLabelRaw =
+    (tx.primaryAppLabel && tx.primaryAppLabel.trim().length > 0)
+      ? tx.primaryAppLabel.trim()
+      : (tx.toLabel || "");
+  const primaryAddress = tx.primaryAppAddress || tx.to;
+
   let contractDisplay = '';
 
-  if (tx.toLabel && tx.toLabel.trim().length > 0) {
-    const trimmed = tx.toLabel.trim();
-    // if the label itself looks like a raw address, shorten it
+  const rawLabel = (tx.primaryAppLabel || tx.toLabel || '')?.trim();
+  const rawAddr = tx.primaryAppAddress || tx.to;
+
+  if (rawLabel && rawLabel.length > 0) {
     contractDisplay =
-      trimmed.startsWith('0x') && trimmed.length > 14
-        ? formatAddress(trimmed)
-        : trimmed;
+      rawLabel.startsWith('0x') && rawLabel.length > 14
+        ? formatAddress(rawLabel)
+        : rawLabel;
+  } else if (rawAddr) {
+    contractDisplay = formatAddress(rawAddr);
   } else {
-    contractDisplay = formatAddress(tx.to);
+    contractDisplay = '';
   }
+
+
 
 
   // gm style app
@@ -2240,40 +2336,57 @@ className="positions-table tx-table"
 return (
   <div
     className={`positions-row tx-row ${
-      isSwapLike ? "swap-row" : ""
-    }`}
+      isSwapLike ? 'swap-row' : ''
+    } ${isScamTx ? 'tx-scam-row' : ''}
+    `}
     key={tx.hash}
   >
-              <span className="col-a">
-                <div>{formatDateTimeLabel(tx.timestamp)}</div>
-                <a
-                  href={`https://explorer.inkonchain.com/tx/${tx.hash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="tx-hash"
-                >
-                  {formatAddress(tx.hash)}
-                </a>
-              </span>
+
+<span className='col-a'>
+  {isScamTx && (
+    <div className='tx-scam-tag'>
+      Scam tx
+    </div>
+  )}
+
+  <div className='tx-date-wrap'>
+    <span className='tx-date-main'>
+      {formatDateTimeLabel(tx.timestamp)}
+    </span>
+    <span className='tx-date-sub'>
+      {formatLastUpdated(tx.timestamp)}
+    </span>
+  </div>
+
+  <a
+    href={`https://explorer.inkonchain.com/tx/${tx.hash}`}
+    target='_blank'
+    rel='noreferrer'
+    className='tx-hash'
+  >
+    {formatAddress(tx.hash)}
+  </a>
+</span>
+
 
 {/* col B: debank style platform */}
 <span className="col-b">
   {(() => {
 // Determine which icon to use
-let iconKey = '';
-const toAddr = (tx.to || '').toLowerCase();
-const platformIcon = PLATFORM_ICONS[toAddr];
+let iconKey = "";
+const appAddr = (tx.primaryAppAddress || tx.to || "").toLowerCase();
+const platformIcon = PLATFORM_ICONS[appAddr];
 
-// prefer platform icon if we know this contract
 if (platformIcon) {
   iconKey = platformIcon;
-} else if (platformMain === 'Send') {
-  iconKey = 'send';
-} else if (platformMain === 'Receive') {
-  iconKey = 'receive';
+} else if (platformMain === "Send") {
+  iconKey = "send";
+} else if (platformMain === "Receive") {
+  iconKey = "receive";
 } else {
-  iconKey = '';
+  iconKey = "";
 }
+
 
 
 
@@ -2281,15 +2394,20 @@ if (platformIcon) {
       <div className="tx-platform-block">
         {/* BIG square icon */}
         <div className="tx-big-icon-wrapper">
-          {iconKey ? (
-            <img
-              src={`/platforms/${iconKey}.svg`}
-              alt={tx.toLabel}
-              className="tx-big-icon"
-            />
-          ) : (
-            <div className="tx-big-icon tx-big-icon-placeholder"></div>
-          )}
+{iconKey ? (
+  <img
+    src={`/platforms/${iconKey}.svg`}
+    alt={tx.toLabel}
+    className="tx-big-icon"
+  />
+) : (
+  // default contract icon
+  <img
+    src="/platforms/contract.svg"
+    alt="contract"
+    className="tx-big-icon"
+  />
+)}
         </div>
 
         {/* Texts */}
@@ -2302,16 +2420,18 @@ if (platformIcon) {
           {/* PLATFORM NAME — clickable search */}
           <div
             className="tx-platform-text"
-            onClick={() => {
-              const trimmed = tx.to?.trim()
-              if (!trimmed) return
-              setSearchInput(trimmed)
-              setWalletAddress(trimmed)
-              setNetWorthHistory([])
-              setHoverIndex(null)
-              setTxPage(1)
-            }}
-            title={tx.to}
+onClick={() => {
+  const addr = (tx.primaryAppAddress || tx.to || '').trim();
+  if (!addr) return;
+  setSearchInput(addr);
+  setWalletAddress(addr);
+  setNetWorthHistory([]);
+  setHoverIndex(null);
+  setTxPage(1);
+}}
+title={tx.primaryAppAddress || tx.to}
+
+
           >
             {contractDisplay}
           </div>
@@ -2371,6 +2491,15 @@ if (platformIcon) {
 // 1) always resolve symbol first
 const symbolUpper = (leg.symbol || '').toUpperCase();
 
+const isNft = symbolUpper.includes('#');
+
+const amountText =
+  leg.amount == null
+    ? ''
+    : isNft
+    ? leg.amount.toFixed(0)    // 1, 2, 3 for NFTs
+    : leg.amount.toFixed(4);   // keep 4 decimals for tokens
+
 // 2) native coin override: ETH / INK always forced
 if (symbolUpper === 'ETH') {
   const iconSrc = 'https://assets.coingecko.com/coins/images/279/large/ethereum.png';
@@ -2425,6 +2554,11 @@ let addrKey = matchToken?.address
   ? matchToken.address.toLowerCase().trim()
   : '';
 
+  // If symbol contains #, it's an NFT → fetch Blockscout icon
+if (symbolUpper.includes("#") && addrKey) {
+  fetchNftIcon(addrKey);
+}
+
 let portfolioToken =
   portfolio?.tokens.find(
     (t) => t.address && t.address.toLowerCase() === addrKey
@@ -2444,15 +2578,38 @@ if (!portfolioToken && leg.symbol && portfolio?.tokens) {
 }
 
 // final icon (non-native)
-const iconSrc =
-  portfolioToken?.iconUrl ||
-  (addrKey && tokenIcons[addrKey]) ||
-  null;
+// final icon (non-native)  // merged NFT + amount line
+let iconSrc: string | undefined;
+
+// if this leg looks like an NFT "BOI #4182", use NFT collection icon
+if (symbolUpper.includes("#")) {
+  const nftAddr = (tx.tokens[0]?.address || "").toLowerCase();
+  if (nftAddr) {
+    const col =
+      nftCollections?.find(
+        (c) => c.address.toLowerCase() === nftAddr
+      ) || null;
+
+    iconSrc =
+      col?.tokens?.[0]?.imageUrl ||
+      tokenIcons[nftAddr] ||
+      undefined;
+  }
+}
+
+// normal tokens fallback
+if (!iconSrc) {
+  iconSrc =
+    portfolioToken?.iconUrl ||
+    (addrKey && tokenIcons[addrKey]) ||
+    undefined;
+}
 
 const priceUsd =
   addrKey && tokenPriceMap[addrKey] != null
     ? tokenPriceMap[addrKey]
     : undefined;
+
 
 const valueUsd =
   leg.amount != null && priceUsd != null
@@ -2475,30 +2632,13 @@ const valueUsd =
                 )}
               </div>
 
-              <span className="tx-amount-symbol">
-                {sign}{" "}
-                {leg.amount != null ? leg.amount.toFixed(4) : ""}{" "}
-                {leg.symbol}
-                {valueUsd != null
-                  ? ` ($${valueUsd.toFixed(2)})`
-                  : ""}
-              </span>
+<span className="tx-amount-symbol">
+  {sign} {amountText} {leg.symbol}
+  {valueUsd != null ? ` ($${valueUsd.toFixed(2)})` : ''}
+</span>
             </div>
           );
         })}
-
-{tx.hasNft && tx.tokens.length > 0 && (
-  <div className="tx-nft-preview real-nft">
-<img
-  src={tokenIcons[tx.tokens[0].address.toLowerCase()] || "/nft.png"}
-      className="tx-nft-img"
-      alt="NFT"
-    />
-    <span className="tx-nft-name">
-      {tx.tokens[0].symbol || "NFT"}
-    </span>
-  </div>
-)}
       </>
     );
   })()}

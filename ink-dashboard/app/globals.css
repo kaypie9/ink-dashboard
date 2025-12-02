@@ -3488,6 +3488,38 @@ body,
   white-space: nowrap;
 }
 
+.tx-table .col-a {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  row-gap: 2px;
+}
+
+.tx-date-wrap {
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+}
+
+.tx-date-main {
+  font-size: 12px;
+  color: #e5e7eb;
+}
+
+.tx-date-sub {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.tx-hash {
+  font-size: 12px;
+  color: #60a5fa;
+}
+
+.tx-hash:hover {
+  color: #93c5fd;
+}
+
 /* columns */
 
 .col-a,
@@ -3856,11 +3888,7 @@ body[data-theme='dark'] .tx-platform-icon {
   border: 1px solid #1e293b;
 }
 
-/* swap highlighting */
-.tx-row.swap-row {
-  background: #f9fafb;
-  border-left: 3px solid #4ade80;
-}
+
 
 /* nft preview badge in the Type column */
 .tx-nft-preview {
@@ -3985,7 +4013,7 @@ body[data-theme='dark'] .tx-platform-icon {
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: #f1f1f5;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4031,7 +4059,7 @@ body[data-theme='dark'] .tx-platform-icon {
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: #ffffff; /* clean white bg like Debank */
+  background: transparent; /* clean white bg like Debank */
   overflow: hidden;    /* THE IMPORTANT PART */
   display: flex;
   align-items: center;
@@ -4044,4 +4072,70 @@ body[data-theme='dark'] .tx-platform-icon {
   object-fit: contain;   /* keep aspect ratio */
   object-position: center;
   display: block;
+}
+
+.tx-scam-row {
+  opacity: 0.45;
+}
+
+.tx-scam-row .tx-amount-symbol,
+.tx-scam-row .tx-hash,
+.tx-scam-row .tx-platform-text,
+.tx-scam-row .tx-method-text {
+  color: var(--ink-text-muted, #7b7f88);
+}
+
+.tx-scam-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  margin-bottom: 2px;
+  background: #2c323c;
+  color: #a0a4ad;
+}
+
+/* LIGHT THEME FIXES */
+body[data-theme="light"] .tx-date-main {
+  color: #374151;     /* dark gray */
+}
+
+body[data-theme="light"] .tx-date-sub {
+  color: #6b7280;     /* medium gray */
+}
+
+body[data-theme="light"] .tx-hash {
+  color: #2563eb;     /* blue like Debank */
+}
+
+body[data-theme="light"] .tx-hash:hover {
+  color: #1d4ed8;
+}
+
+/* DARK THEME FIX */
+body[data-theme="dark"] .tx-method-text {
+  color: #e5e7eb;     /* light gray */
+}
+
+body[data-theme="dark"] .tx-platform-text {
+  color: #9ca3af;     /* medium gray (readable) */
+}
+
+body[data-theme="dark"] .tx-platform-text:hover {
+  color: #d1d5db;
+}
+
+/* LIGHT THEME FIX */
+body[data-theme="light"] .tx-method-text {
+  color: #1f2937;     /* dark gray */
+}
+
+body[data-theme="light"] .tx-platform-text {
+  color: #4b5563;     /* normal readable */
+}
+
+body[data-theme="light"] .tx-platform-text:hover {
+  color: #1f2937;
 }

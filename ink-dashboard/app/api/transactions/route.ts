@@ -13,6 +13,9 @@ const KNOWN_APPS: Record<string, string> = {
     // Nado Ink
   '0x05ec92d78ed421f3d3ada77ffde167106565974e': 'Nado',
 
+   // velodrom Ink
+  '0x3a63171dd9bebf4d07bc782fecc7eb0b890c2a45': 'Velodrome V2'
+
   // fill with real ones later
   // '0xuni_router_address_here': 'inkySwap',
   // '0xsuperswap_router_here': 'SuperSwap',
@@ -24,21 +27,25 @@ type TxToken = {
 }
 
 type TxItem = {
-  hash: string
-  timestamp: number
-  direction: 'in' | 'out' | 'self'
-  from: string
-  to: string
-  otherParty: string
-  valueInk: number
-  gasFeeInk: number
-  gasFeeUsd: number
-  details: string
-  hasNft: boolean
-  status: string
-  tokens: TxToken[]
-  toLabel: string   // label of interacted contract / app
-}
+  hash: string;
+  timestamp: number;
+  direction: "in" | "out" | "self";
+  from: string;
+  to: string;
+  otherParty: string;
+  valueInk: number;
+  gasFeeInk: number;
+  gasFeeUsd: number;
+  details: string;
+  hasNft: boolean;
+  status: string;
+  tokens: TxToken[];
+  method?: string;
+  toLabel?: string;
+  primaryAppAddress?: string | null;
+  primaryAppLabel?: string | null;
+};
+
 
 // ---------------------------------------------------------------------
 // helpers
@@ -380,14 +387,24 @@ id = id ? String(id).trim() : '';
         let part = ''
 
 if (isNft) {
-  const id = tr.token_id ?? tr.id ?? tr.tokenId ?? ''
+  const id =
+    tr.token_id ??
+    tr.token?.token_id ??
+    tr.token?.id ??
+    tr.total?.token_id ??
+    tr.total?.id ??
+    tr.value?.token_id ??
+    tr.value?.id ??
+    tr.id ??
+    tr.tokenId ??
+    ''
 
   if (dir === 'out') {
     // nft sent
-    part = `- ${symbol} #${id}`
+    part = `Sent ${symbol} #${id}`
   } else if (dir === 'in') {
     // nft received
-    part = `+ ${symbol} #${id}`
+    part = `Received ${symbol} #${id}`
   } else {
     part = `${symbol} #${id}`
   }
@@ -463,7 +480,7 @@ if (isNft) {
 
       const tokens = Object.values(tokenMap)
 
-      // -------- pick the "interacted contract" side (this is the fix) -----
+      // pick the interacted contract side
       const looksContract = (side: any) =>
         !!(
           side?.smart_contract ||
@@ -480,12 +497,23 @@ if (isNft) {
       if (interactedSide) {
         toLabel = labelOf(interactedSide)
       } else {
-        // fallback: if we sent, contract is usually `to`; if we received, usually `from`
+        // fallback: if we sent, contract is usually to, if received, usually from
         toLabel =
           direction === 'out'
             ? labelOf(toObj || to)
             : labelOf(fromObj || from)
       }
+
+      // primary app fields for frontend
+      const primaryAppAddress =
+        interactedSide
+          ? addr(interactedSide)
+          : (direction === 'out' ? to : from)
+
+      const primaryAppLabel =
+        interactedSide
+          ? labelOf(interactedSide)
+          : toLabel
 
       return {
         hash,
@@ -502,7 +530,9 @@ if (isNft) {
         status,
         tokens,
         toLabel,
-        method,   // ← add this
+        method,
+        primaryAppAddress,
+        primaryAppLabel,
       }
     })
 
