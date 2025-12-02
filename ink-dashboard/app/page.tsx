@@ -1941,8 +1941,9 @@ const value = t.valueUsd ?? price * t.balance
     const creatorAddr = ((v.creatorAddress as string) || '').toLowerCase();
 
     // nice human protocol name, falls back to v.protocol
-    const protocolLabel =
-      (creatorAddr && PROTOCOL_LABELS[creatorAddr]) || platform;
+const protocolLabel = creatorAddr
+  ? PROTOCOL_LABELS[creatorAddr] || shortAddress(creatorAddr)
+  : platform;
 
     const addrKey = rawAddr.toLowerCase();
 
@@ -1985,14 +1986,13 @@ return (
   </div>
 
   {explorerUrl ? (
-    <a
-      href={explorerUrl}
-      target='_blank'
-      rel='noreferrer'
-      className='tx-platform-text'
-    >
-      {label}
-    </a>
+<a
+  href={explorerUrl}
+  className="tx-platform-text"
+>
+  {protocolLabel}
+</a>
+
   ) : (
     <div className='tx-platform-text'>
       {label}

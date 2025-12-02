@@ -9,26 +9,35 @@ const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2';
 const BLOCKSCOUT_RPC_BASE = 'https://explorer.inkonchain.com/api'
 
 
-async function fetchRealCreator(addr: string): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://explorer.inkonchain.com/api/v2/addresses/${addr}/creation`
-    );
+async function resolveCreatorAddress(pairAddr: string): Promise<string | null> {
+  const factory = await readFactory(pairAddr);
+  if (!factory) return null;
 
-    if (!res.ok) return null;
-    const data = await res.json();
+  const owner = await readFactoryOwner(factory);
+  if (owner) return owner;
 
-    const creator = data?.creator_address;
-    if (creator && creator.length === 42) {
-      return creator.toLowerCase();
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
+  return factory; // fallback
 }
 
+
+
+async function readFactory(pairAddr: string): Promise<string | null> {
+  const data = "0xc45a0155"; // keccak256("factory()")
+  const hex = await ethCallRaw(pairAddr, data);
+  const body = hex.replace(/^0x/, "");
+  if (body.length < 64) return null;
+  const addr = "0x" + body.slice(24, 64);
+  return addr.toLowerCase();
+}
+
+async function readFactoryOwner(factoryAddr: string): Promise<string | null> {
+  const data = "0x8da5cb5b"; // owner()
+  const hex = await ethCallRaw(factoryAddr, data);
+  const body = hex.replace(/^0x/, "");
+  if (body.length < 64) return null;
+  const addr = "0x" + body.slice(24, 64);
+  return addr.toLowerCase();
+}
 
 
 
@@ -709,7 +718,7 @@ const enrichedVaults: VaultPosition[] = await Promise.all(
 
     let creator: string | null = null
     try {
-creator = await fetchRealCreator(addr)
+creator = await resolveCreatorAddress(addr)
     } catch {
       creator = null
     }
