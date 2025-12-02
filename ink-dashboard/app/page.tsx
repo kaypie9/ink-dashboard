@@ -17,7 +17,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 
-  // ADD MORE
+  // ADD MORE for TRANSACTIONS
 const PLATFORM_ICONS: Record<string, string> = {
   // inkypump
   '0x1d74317d760f2c72a94386f50e8d10f2c902b899': 'inkypump',
@@ -37,6 +37,19 @@ const PLATFORM_ICONS: Record<string, string> = {
   '0x9f500d075118272b3564ac6ef2c70a9067fd2d3f': 'dailygm',
 
 }
+
+  // ADD MORE for YIELDING
+  
+const PROTOCOL_LABELS: Record<string, string> = {
+  // Nado pools creator
+  '0x458c5d5b75ccba22651d2c5b61cb1ea1e0b0f95d': 'Superswap',
+
+  // Velodrome
+  '0x31832f2a97fd20664d76cc421207669b55ce4bc0': 'Velodrome',
+};
+
+
+
 
 // svg footer - step style X icon
 const TwitterIconSvg = () => (
@@ -947,6 +960,8 @@ const yieldingPositions = useMemo(() => {
   if (!portfolio) return [];
   return portfolio.vaults || [];
 }, [portfolio]);
+
+console.log('YIELDING POSITIONS', yieldingPositions);
 
 
 const explorerTxUrl = walletAddress
@@ -1915,19 +1930,31 @@ const value = t.valueUsd ?? price * t.balance
 
     const apr = Number(v.apr ?? v.apy ?? 0);
 
-    // main token or pool address, for icons later if we want
+    // main contract or pool address
     const rawAddr =
       (v.tokenAddress as string) ||
       (v.poolAddress as string) ||
       (v.contractAddress as string) ||
       '';
 
+    // creator address from backend (you may have named it slightly differently)
+    const creatorAddr = ((v.creatorAddress as string) || '').toLowerCase();
 
+    // nice human protocol name, falls back to v.protocol
+    const protocolLabel =
+      (creatorAddr && PROTOCOL_LABELS[creatorAddr]) || platform;
 
     const addrKey = rawAddr.toLowerCase();
-    const platformKey = addrKey && PLATFORM_ICONS[addrKey]
-      ? PLATFORM_ICONS[addrKey]
-      : "";
+
+    const platformKey =
+      addrKey && PLATFORM_ICONS[addrKey]
+        ? PLATFORM_ICONS[addrKey]
+        : '';
+
+    // link should ideally go to creator page
+    const explorerUrl = creatorAddr
+      ? `https://explorer.inkonchain.com/address/${creatorAddr}`
+      : '';
 
 return (
   <div className="positions-row yielding-row" key={idx}>
@@ -1952,14 +1979,26 @@ return (
             )}
           </div>
 
-          <div className="tx-platform-meta">
-            <div className="tx-method-text">
-              {platform}
-            </div>
-            <div className="tx-platform-text">
-              {label}
-            </div>
-          </div>
+<div className='tx-platform-meta'>
+  <div className='tx-method-text'>
+    {protocolLabel}
+  </div>
+
+  {explorerUrl ? (
+    <a
+      href={explorerUrl}
+      target='_blank'
+      rel='noreferrer'
+      className='tx-platform-text'
+    >
+      {label}
+    </a>
+  ) : (
+    <div className='tx-platform-text'>
+      {label}
+    </div>
+  )}
+</div>
         </span>
 
         {/* POOL: debank style pair icons + label */}

@@ -6,6 +6,32 @@ const RPC_URL =
   process.env.NEXT_PUBLIC_INK_RPC || 'https://rpc-gel.inkonchain.com';
 
 const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2';
+const BLOCKSCOUT_RPC_BASE = 'https://explorer.inkonchain.com/api'
+
+
+async function fetchRealCreator(addr: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://explorer.inkonchain.com/api/v2/addresses/${addr}/creation`
+    );
+
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const creator = data?.creator_address;
+    if (creator && creator.length === 42) {
+      return creator.toLowerCase();
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+
+
+
 
 const BIGINT_ZERO = BigInt(0);
 
@@ -151,7 +177,10 @@ type VaultPosition = {
     amount0: number;
     amount1: number;
   };
+  creatorAddress: string | null;
 };
+
+
 
 async function fetchTokenSymbol(addr: string): Promise<string> {
   try {
@@ -632,22 +661,21 @@ pricedTokens = await applyLpDecompositionAuto(pricedTokens, priceMap);
         const valueUsd =
           t.valueUsd != null ? t.valueUsd : price * t.balance;
 
-        vaults.push({
-          tokenAddress: t.address,
-          symbol: t.symbol,
-          protocol: hint.protocol,
-          poolName: hint.pool,
-          amount: t.balance,
-          depositedUsd: valueUsd,
-          rewardsUsd: 0,
-          lpBreakdown: t.lpBreakdown,
-        });
+vaults.push({
+  tokenAddress: t.address,
+  symbol: t.symbol,
+  protocol: hint.protocol,
+  poolName: hint.pool,
+  amount: t.balance,
+  depositedUsd: valueUsd,
+  rewardsUsd: 0,
+  lpBreakdown: t.lpBreakdown,
+  creatorAddress: null,
+});
       } else {
         spotTokens.push(t);
       }
     }
-
-
 
     const stablesUsd = spotTokens
       .filter((t) => stableSymbols.has(t.symbol.toUpperCase()))
@@ -667,6 +695,38 @@ pricedTokens = await applyLpDecompositionAuto(pricedTokens, priceMap);
 
     const totalValueUsd = nativeUsd + tokensUsd + vaultDepositsUsd;
 
+const enrichedVaults: VaultPosition[] = await Promise.all(
+  vaults.map(async (v) => {
+    const rawAddr: string =
+      v.tokenAddress ||
+      (v as any).poolAddress ||
+      (v as any).contractAddress ||
+      ''
+
+    if (!rawAddr) return v
+
+    const addr = rawAddr.toLowerCase()
+
+    let creator: string | null = null
+    try {
+creator = await fetchRealCreator(addr)
+    } catch {
+      creator = null
+    }
+
+    return {
+      ...v,
+      creatorAddress: creator,
+    }
+  }),
+)
+
+
+
+
+
+
+
     const portfolio = {
       mock: false,
       address: wallet,
@@ -676,16 +736,14 @@ pricedTokens = await applyLpDecompositionAuto(pricedTokens, priceMap);
         stables: stablesUsd,
         lpTokens: 0,
       },
-      vaults,
+      vaults: enrichedVaults,
       vaultDepositsUsd,
       unclaimedYieldUsd: 0,
       tokens: spotTokens,
     };
 
-
-
-
     return NextResponse.json(portfolio);
+
   } catch (err) {
     console.error('api/portfolio fatal error', err);
     return NextResponse.json(
