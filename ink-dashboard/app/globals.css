@@ -34,16 +34,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  height: 56px;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 
   height: 78px;
   padding: 16px 32px;
@@ -681,14 +671,14 @@ body[data-theme="dark"] .header-right button:hover {
   align-items: center;
 }
 
-
-.positions-row-head {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #9ca3af;
-  background: #f9fafb;
+/* Yielding table specific grid */
+.yielding-table .yielding-head,
+.yielding-table .yielding-row {
+  display: grid;
+  grid-template-columns: 2.4fr 2fr 1.6fr 1.1fr 0.5fr; /* protocol | pool | balance | rewards | value */
+  column-gap: 12px;
 }
+
 
 /* light row borders */
 .positions-row:not(.positions-row-head) + .positions-row {
@@ -771,39 +761,6 @@ body[data-theme='light'] .positions-tab-btn-active {
   color: #0f172a;
 }
 
-/* DARK MODE */
-body[data-theme='dark'] .positions-tab-btn {
-  color: #9ca3af;
-  border-color: rgba(31, 41, 55, 0.95);
-  background: rgba(15, 23, 42, 0.3);
-  backdrop-filter: blur(10px);
-}
-
-body[data-theme='dark'] .positions-tab-btn:hover {
-  color: #e5e7eb;
-  background: rgba(30, 64, 175, 0.3);
-}
-
-/* dark mode active: neon glass pill */
-body[data-theme='dark'] .positions-tab-btn-active {
-  color: #f9fafb;
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.25),
-    rgba(129, 140, 248, 0.55),
-    rgba(236, 72, 153, 0.45)
-  );
-  border-color: rgba(191, 219, 254, 0.9);
-  box-shadow:
-    0 0 0 1px rgba(129, 140, 248, 0.7),
-    0 10px 30px rgba(15, 23, 42, 0.8);
-}
-
-/* dark mode active glow line */
-body[data-theme='dark'] .positions-tab-btn-active::after {
-  background: linear-gradient(90deg, #38bdf8, #8b5cf6, #f97316);
-}
-
 /* DARK MODE: portfolio tabs */
 body[data-theme="dark"] .positions-tab-btn {
   color: #858a9a; /* soft muted grey */
@@ -845,27 +802,6 @@ body[data-theme="dark"] .positions-tab-btn-active {
 
 .col-pnl-flat {
   color: #9ca3af;
-}
-
-/* main portfolio value widget */
-.portfolio-header-card {
-  width: 100%;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 18px 20px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 26px;
-  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
-}
-
-.portfolio-chart {
-  height: 140px;     /* bigger chart */
-  width: 100%;
-  display: flex;
-  align-items: center;
 }
 
 .portfolio-chart svg {
@@ -1018,47 +954,23 @@ body[data-theme="dark"] .portfolio-value {
   cursor: default;
 }
 
-/* split card: left meta / right net worth */
-.portfolio-header-card {
-  width: 100%;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 18px 20px;
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 26px;
-  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
-
 /* layout for the top card */
 .portfolio-header-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 2.5fr);
-  column-gap: 40px;
+  /* give more room to the chart / net worth */
+  grid-template-columns: 0.9fr 1.1fr;
+  column-gap: 24px;
   align-items: center;
 }
+
+
 
 /* push Net worth away from the wallet block and add a soft divider */
 .portfolio-networth {
-  padding-left: 32px;
+  padding-left: 16px;
   border-left: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-/* make chart + numbers fill the right side nicely */
-.portfolio-networth-main {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 24px;
-  align-items: center;
-}
-
-
-  /* for loading overlay */
-  position: relative;
-  overflow: hidden;
-}
 
 /* overlay when loading a wallet */
 .portfolio-loading-overlay {
@@ -1105,13 +1017,6 @@ body[data-theme="dark"] .portfolio-value {
   flex-direction: column;
   justify-content: space-between;
   gap: 10px;
-}
-
-.portfolio-networth {
-  flex: 1.2;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 /* wallet identity */
@@ -1177,19 +1082,13 @@ body[data-theme="dark"] .portfolio-value {
 .portfolio-networth-main {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 28px;        /* was 18px – more premium spacing */
+  padding: 6px 0;  /* adds subtle vertical space */
 }
 
-/* the chart area */
-.portfolio-chart {
-  width: 160px;
-  height: 60px;
-  background: url("/placeholder-chart.png");
-  background-size: cover;
-  background-position: center;
-  opacity: 0.9;
+.portfolio-networth {
+  padding-left: 60px;   /* was 32px – slightly more airy */
 }
-
 
 
 /* green percent */
@@ -1220,13 +1119,6 @@ body[data-theme="dark"] .portfolio-value {
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.portfolio-title-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
 }
 
 .portfolio-title {
@@ -1726,11 +1618,6 @@ body[data-theme="dark"] .wallet-action-btn {
    DARK THEME (CLEAN + PREMIUM)
    =========================== */
 
-body[data-theme="dark"] {
-  background: #020617;
-  color: #e5e7eb;
-}
-
 /* HEADER */
 body[data-theme="dark"] .header {
   background: #020617;
@@ -1885,78 +1772,63 @@ body[data-theme="dark"] .refresh-btn:hover {
 
 
 
-.refresh-btn {
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  font-size: 12px;
-  font-weight: 500;
-  color: #4b5563;
-  cursor: pointer;
-  transition: 0.15s ease;
-}
 
-.refresh-btn:hover {
-  background: #f3f4f6;
-}
 
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
 
-/* small overlay inside portfolio card while loading */
-.portfolio-loading-overlay {
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  z-index: 2;
-}
 
-.portfolio-loading-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  border: 2px solid #d1d5db;
-  border-top-color: #4f46e5;
-  animation: spin 0.7s linear infinite;
-}
 
-.portfolio-loading-text {
-  font-size: 12px;
-  color: #6b7280;
-}
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
-/* dark mode tweaks */
-body[data-theme="dark"] .refresh-btn {
-  background: #020617;
-  border-color: #1e293b;
-  color: #cbd5e1;
-}
 
-body[data-theme="dark"] .refresh-btn:hover {
-  background: #0f172a;
-}
 
-body[data-theme="dark"] .portfolio-loading-overlay {
-  background: rgba(15, 23, 42, 0.75);
-}
 
-body[data-theme="dark"] .portfolio-loading-text {
-  color: #cbd5e1;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .refresh-round-btn {
   width: 34px;
@@ -1995,32 +1867,6 @@ body[data-theme="dark"] .refresh-round-btn:hover {
   background: #0f172a;
 }
 
-.portfolio-range-switch {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  font-size: 10px;
-}
-
-.range-btn {
-  border: none;
-  background: transparent;
-  padding: 2px 6px;
-  border-radius: 999px;
-  cursor: pointer;
-  opacity: 0.6;
-}
-
-.range-btn-active {
-  background: var(--ink-surface-elevated, rgba(255, 255, 255, 0.06));
-  opacity: 1;
-}
-
-.chart-svg {
-  width: 100%;
-  height: 100%;
-}
-
 .portfolio-networth {
   display: flex;
   flex-direction: column;
@@ -2031,8 +1877,9 @@ body[data-theme="dark"] .refresh-round-btn:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 10px;
 }
+
 
 .portfolio-title-left {
   display: flex;
@@ -2080,11 +1927,10 @@ body[data-theme="dark"] .refresh-round-btn:hover {
 }
 
 .premium-networth {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(200px, 0.9fr);
-  gap: 16px;
-  align-items: stretch;
+  grid-template-columns: 1.1fr 0.9fr;
+  column-gap: 12px;
 }
+
 
 .portfolio-chart-wrapper {
   position: relative;
@@ -2093,7 +1939,7 @@ body[data-theme="dark"] .refresh-round-btn:hover {
 
 .portfolio-chart-bg {
   position: absolute;
-  inset: 12px 0 0 0;
+  inset: 20px 0 0 0;   /* pushes the gradient down a bit */
   border-radius: 14px;
   background: linear-gradient(
     to bottom,
@@ -2198,15 +2044,10 @@ body[data-theme="dark"] .refresh-round-btn:hover {
 
 .portfolio-chart {
   position: relative;
-  height: 110px;
+  height: 150px;
   width: 100%;
   display: flex;
   align-items: center;
-}
-
-.chart-svg {
-  width: 100%;
-  height: 100%;
 }
 
 .portfolio-header-content.premium-meta {
@@ -2743,9 +2584,6 @@ body[data-theme='dark'] .last-updated-text {
 }
 
 /* hover highlight, but not on header */
-.positions-table .positions-row:not(.positions-row-head):hover {
-  background: rgba(15, 23, 42, 0.02);
-}
 
 [data-theme="dark"] .positions-table .positions-row {
   border-bottom: 1px solid rgba(148, 163, 184, 0.16);
@@ -3177,11 +3015,6 @@ body[data-theme='light'] .positions-table {
   overflow: visible !important;
 }
 
-/* wallet tab uses 4 columns  token / price / amount / value */
-.wallet-table .positions-row {
-  grid-template-columns: 2.4fr 1.2fr 1.2fr 1.4fr;
-}
-
 /* WALLET TAB: exactly 4 columns  token | price | amount | value */
 .wallet-table .positions-row {
   display: grid;
@@ -3443,18 +3276,6 @@ body,
 .tx-token-address {
   font-size: 11px;
   opacity: 0.7;
-}
-
-
-@keyframes txTokenDropdownFade {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* debank style 4-column tx table */
@@ -3997,10 +3818,6 @@ body[data-theme='dark'] .tx-platform-icon {
   opacity: 0.85; /* tiny visual feedback */
 }
 
-.tx-platform-link:hover {
-  opacity: 0.8;
-}
-
 /* DEBANK STYLE PLATFORM BLOCK */
 
 .tx-platform-block {
@@ -4138,4 +3955,48 @@ body[data-theme="light"] .tx-platform-text {
 
 body[data-theme="light"] .tx-platform-text:hover {
   color: #1f2937;
+}
+
+.lp-pair-icons {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 28px;
+  height: 20px;
+}
+
+.lp-pair-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  background: #0f172a;
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  overflow: hidden;
+}
+
+.lp-pair-icon-left {
+  z-index: 2;
+}
+
+.lp-pair-icon-right {
+  margin-left: -8px;
+}
+
+.lp-pair-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* keep amount + symbol on same line inside each balance row */
+.yielding-balance-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
 }

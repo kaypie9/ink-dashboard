@@ -108,13 +108,22 @@ type PageKey = "Home" | "Swap" | "Test" | "Batch Send" | "Explore" | "About Us";
 type TokenHolding = {
   address: string;
   symbol: string;
+  name?: string;
   decimals: number;
   rawBalance: string;
   balance: number;
   priceUsd?: number;
   valueUsd?: number;
   iconUrl?: string;
+  lpBreakdown?: {
+    token0Symbol: string;
+    token1Symbol: string;
+    amount0: number;
+    amount1: number;
+  };
 };
+
+
 
 type HistoryRange = "1W" | "1M" | "1Y";
 
@@ -904,11 +913,41 @@ const handleNftSort = (key: "balance" | "spent") => {
 };
 
 
-  const visibleTokens = portfolio
-    ? portfolio.tokens.filter((t) => !isSpamToken(t))
-    : [];
+const visibleTokens = portfolio
+  ? portfolio.tokens.filter((t) => !isSpamToken(t))
+  : [];
 
-    const yieldingPositions = portfolio?.vaults ?? [];
+const walletTokens = portfolio
+  ? (() => {
+      const rows: TokenHolding[] = [...visibleTokens];
+
+      const nativeBal = portfolio.balances?.nativeInk ?? 0;
+      const nativePrice = nativeUsdPrice || 0;
+
+      if (nativeBal > 0) {
+        rows.unshift({
+          address: 'native-ink',
+          symbol: 'ETH',
+          decimals: 18,
+          rawBalance: nativeBal.toString(),
+          balance: nativeBal,
+          priceUsd: nativePrice || undefined,
+          valueUsd: nativePrice ? nativeBal * nativePrice : undefined,
+          iconUrl:
+            'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
+        });
+      }
+
+      return rows;
+    })()
+  : [];
+
+// auto detect LP / vault style tokens and treat them as yielding positions
+const yieldingPositions = useMemo(() => {
+  if (!portfolio) return [];
+  return portfolio.vaults || [];
+}, [portfolio]);
+
 
 const explorerTxUrl = walletAddress
   ? `https://explorer.inkonchain.com/address/${walletAddress}?tab=txs`
@@ -958,6 +997,23 @@ const tokenPriceMap = useMemo(() => {
   return m;
 }, [portfolio]);
 
+const findTokenIconBySymbol = (sym: string): string | null => {
+  if (!sym || !portfolio) return null;
+
+  const upper = sym.toUpperCase();
+  const match =
+    portfolio.tokens.find(
+      (t) => (t.symbol || '').toUpperCase() === upper
+    ) || null;
+
+  if (!match) return null;
+
+  const addrKey = match.address?.toLowerCase();
+  return (
+    match.iconUrl ||
+    (addrKey ? tokenIcons[addrKey] || null : null)
+  );
+};
 
 // final filtered transactions
 const filteredTxs = useMemo(() => {
@@ -1715,7 +1771,7 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
 {!isLoadingPortfolio &&
   !portfolioError &&
   portfolio &&
-  visibleTokens.length === 0 && (
+walletTokens.length === 0 && (
     <div className="positions-row positions-row-empty">
       <span className="col-token">no tokens found</span>
       <span className="col-price"></span>
@@ -1729,7 +1785,7 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
 {!isLoadingPortfolio &&
   !portfolioError &&
   portfolio &&
-  visibleTokens.map((t) => {
+walletTokens.map((t) => {
 const price = t.priceUsd ?? 0
 const value = t.valueUsd ?? price * t.balance
 
@@ -1782,33 +1838,29 @@ const value = t.valueUsd ?? price * t.balance
 
   {/* TAB 2: yielding pools placeholder */}
 {positionsTab === "yielding" && (
-  <div className="positions-table">
-<div className="positions-row positions-row-head tx-row-head nft-head">
+  <div className="positions-table yielding-table">
+<div className="positions-row positions-row-head yielding-head">
 
   {/* PROTOCOL */}
-  <span className="col-token nft-head-col" style={{ width: "25%" }}>
-    Protocol
-  </span>
+<span className='col-token nft-head-col' style={{ width: '22%' }}>
+  Protocol
+</span>
 
-  {/* POOL */}
-  <span className="col-token nft-head-col" style={{ width: "30%" }}>
-    Pool
-  </span>
+<span className='col-token nft-head-col' style={{ width: '30%' }}>
+  Pool
+</span>
 
-  {/* BALANCE */}
-  <span className="col-amount nft-head-col" style={{ width: "15%", textAlign: "center" }}>
-    Balance
-  </span>
+<span className='col-amount nft-head-col' style={{ width: '28%', textAlign: 'center' }}>
+  Balance
+</span>
 
-  {/* REWARDS */}
-  <span className="col-amount nft-head-col" style={{ width: "15%", textAlign: "center" }}>
-    Rewards
-  </span>
+<span className='col-amount nft-head-col' style={{ width: '10%', textAlign: 'center' }}>
+  Rewards
+</span>
 
-  {/* VALUE */}
-  <span className="col-value nft-head-col" style={{ width: "15%", textAlign: "right" }}>
-    Value (USD)
-  </span>
+<span className='col-value nft-head-col' style={{ width: '10%', textAlign: 'right' }}>
+  Value (USD)
+</span>
 
 </div>
 
@@ -1844,69 +1896,195 @@ const value = t.valueUsd ?? price * t.balance
         </div>
       )}
 
-    {!showSkeleton &&
-      !portfolioError &&
-      portfolio &&
-      yieldingPositions.map((v, idx) => {
-        const label =
-          (v.name as string) ||
-          (v.symbol as string) ||
-          (v.poolName as string) ||
-          "yield position";
+{!showSkeleton &&
+  !portfolioError &&
+  portfolio &&
+  yieldingPositions.map((v: any, idx: number) => {
+    const label =
+      v.poolName ||
+      v.name ||
+      v.symbol ||
+      'yield position';
 
-        const platform =
-          (v.protocol as string) ||
-          (v.platform as string) ||
-          "unknown";
+    const platform = v.protocol || 'unknown';
 
-        const depositedUsd =
-          (v.depositedUsd as number) ??
-          (v.valueUsd as number) ??
-          (v.depositsUsd as number) ??
-          0;
+    const depositedUsd =
+      Number(v.depositedUsd ?? v.valueUsd ?? 0);
 
-        const amount =
-          (v.amount as number) ??
-          (v.stakedAmount as number) ??
-          0;
+    const amount = Number(v.amount ?? 0);
 
-        const apr =
-          (v.apr as number) ??
-          (v.apy as number) ??
-          0;
+    const apr = Number(v.apr ?? v.apy ?? 0);
 
-        
+    // main token or pool address, for icons later if we want
+    const rawAddr =
+      (v.tokenAddress as string) ||
+      (v.poolAddress as string) ||
+      (v.contractAddress as string) ||
+      '';
+
+
+
+    const addrKey = rawAddr.toLowerCase();
+    const platformKey = addrKey && PLATFORM_ICONS[addrKey]
+      ? PLATFORM_ICONS[addrKey]
+      : "";
+
 return (
-  <div className="positions-row" key={idx}>
+  <div className="positions-row yielding-row" key={idx}>
+        {/* PROTOCOL with icon */}
+        <span
+          className="col-token"
+          style={{ width: "22%", display: "flex", alignItems: "center" }}
+        >
+          <div className="tx-big-icon-wrapper" style={{ marginRight: 8 }}>
+            {platformKey ? (
+              <img
+                src={`/platforms/${platformKey}.svg`}
+                alt={platform}
+                className="tx-big-icon"
+              />
+            ) : (
+              <img
+                src="/platforms/contract.svg"
+                alt={platform}
+                className="tx-big-icon"
+              />
+            )}
+          </div>
 
-    {/* PROTOCOL */}
-    <span className="col-token" style={{ width: "25%", display: "flex", alignItems: "center" }}>
-      {platform}
-    </span>
+          <div className="tx-platform-meta">
+            <div className="tx-method-text">
+              {platform}
+            </div>
+            <div className="tx-platform-text">
+              {label}
+            </div>
+          </div>
+        </span>
 
-    {/* POOL */}
-    <span className="col-token" style={{ width: "30%", minWidth: 0 }}>
-      {label}
-    </span>
+        {/* POOL: debank style pair icons + label */}
+        <span
+          className="col-token"
+          style={{
+            width: "30%",
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+{(() => {
+  const poolText = (v.poolName as string) || label || "";
+  let leftSym = "";
+  let rightSym = "";
 
-    {/* BALANCE */}
-    <span className="col-amount" style={{ width: "15%", textAlign: "center" }}>
-      {amount ? amount.toFixed(4) : "-"}
-    </span>
+  // 1. prefer symbols from lpBreakdown if present
+  if (
+    v.lpBreakdown &&
+    v.lpBreakdown.token0Symbol &&
+    v.lpBreakdown.token1Symbol
+  ) {
+    leftSym = v.lpBreakdown.token0Symbol;
+    rightSym = v.lpBreakdown.token1Symbol;
+  } else {
+    // 2. fallback to parsing from pool name like iETH/WETH
+    const match = poolText.match(/([A-Za-z0-9]+)\/([A-Za-z0-9]+)/);
+    if (match) {
+      leftSym = match[1];
+      rightSym = match[2];
+    }
+  }
 
-    {/* REWARDS */}
-    <span className="col-amount" style={{ width: "15%", textAlign: "center" }}>
-      {apr ? `${apr.toFixed(2)}%` : "-"}
-    </span>
+  const displayLabel =
+    leftSym && rightSym
+      ? `${leftSym}+${rightSym}`
+      : poolText || "LP token";
 
-    {/* VALUE */}
-    <span className="col-value" style={{ width: "15%", textAlign: "right" }}>
-      {`$${depositedUsd.toFixed(2)}`}
-    </span>
+  const leftIcon = leftSym ? findTokenIconBySymbol(leftSym) : null;
+  const rightIcon = rightSym ? findTokenIconBySymbol(rightSym) : null;
 
-  </div>
-);
-      })}
+  return (
+    <>
+      <div className="lp-pair-icons">
+        <div className="lp-pair-icon lp-pair-icon-left">
+          {leftIcon ? (
+            <img
+              src={leftIcon}
+              className="lp-pair-icon-img"
+              alt={leftSym || "token"}
+            />
+          ) : (
+            (leftSym || "?")[0].toUpperCase()
+          )}
+        </div>
+        <div className="lp-pair-icon lp-pair-icon-right">
+          {rightIcon ? (
+            <img
+              src={rightIcon}
+              className="lp-pair-icon-img"
+              alt={rightSym || "token"}
+            />
+          ) : (
+            (rightSym || "?")[0].toUpperCase()
+          )}
+        </div>
+      </div>
+
+      <span
+        style={{
+          whiteSpace: "normal",
+          overflow: "visible",
+        }}
+      >
+        {displayLabel}
+      </span>
+    </>
+  );
+})()}
+
+        </span>
+
+
+        {/* BALANCE */}
+<span
+  className="col-amount"
+  style={{ width: "28%", textAlign: "center" }}
+>
+  {v.lpBreakdown && v.lpBreakdown.amount0 && v.lpBreakdown.amount1 ? (
+    <div className="yielding-balance-lines">
+      <div>
+        {v.lpBreakdown.amount0.toFixed(6)} {v.lpBreakdown.token0Symbol}
+      </div>
+      <div>
+        {v.lpBreakdown.amount1.toFixed(6)} {v.lpBreakdown.token1Symbol}
+      </div>
+    </div>
+  ) : (
+    amount ? amount.toFixed(4) : "-"
+  )}
+</span>
+
+
+
+        {/* APR */}
+        <span
+          className="col-amount"
+          style={{ width: "15%", textAlign: "center" }}
+        >
+          {apr ? `${apr.toFixed(2)}%` : "-"}
+        </span>
+
+        {/* VALUE */}
+        <span
+          className="col-value"
+          style={{ width: "15%", textAlign: "right" }}
+        >
+          {`$${depositedUsd.toFixed(2)}`}
+        </span>
+      </div>
+    );
+  })}
+
   </div>
 )}
 

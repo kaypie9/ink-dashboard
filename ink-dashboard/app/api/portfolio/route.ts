@@ -7,16 +7,221 @@ const RPC_URL =
 
 const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2';
 
+const BIGINT_ZERO = BigInt(0);
+
+async function ethCallRaw(to: string, data: string): Promise<string> {
+  try {
+    const res = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id: 1,
+        jsonrpc: '2.0',
+        method: 'eth_call',
+        params: [
+          {
+            to,
+            data,
+          },
+          'latest',
+        ],
+      }),
+    });
+
+    const json = await res.json();
+    const hex = String(json.result || '0x0');
+    return hex;
+  } catch (e) {
+    console.error('ethCallRaw failed', e);
+    return '0x0';
+  }
+}
+
+function hexToBigInt(hex: string): bigint {
+  if (!hex || typeof hex !== 'string') return BIGINT_ZERO;
+  try {
+    return BigInt(hex);
+  } catch {
+    return BIGINT_ZERO;
+  }
+}
+
+
+async function readTotalSupply(tokenAddr: string): Promise<bigint> {
+  // totalSupply()
+  const data = '0x18160ddd';
+  const hex = await ethCallRaw(tokenAddr, data);
+  return hexToBigInt(hex);
+}
+
+// Uniswap V2 style views to auto detect LP pairs
+
+// token0()
+async function readToken0(pairAddr: string): Promise<string> {
+  const data = '0x0dfe1681';
+  const hex = await ethCallRaw(pairAddr, data);
+  const body = hex.replace(/^0x/, '');
+  if (body.length < 64) return '';
+  const field = body.slice(0, 64);
+  const addrHex = '0x' + field.slice(24); // last 20 bytes
+  return addrHex.toLowerCase();
+}
+
+// token1()
+async function readToken1(pairAddr: string): Promise<string> {
+  const data = '0xd21220a7';
+  const hex = await ethCallRaw(pairAddr, data);
+  const body = hex.replace(/^0x/, '');
+  if (body.length < 64) return '';
+  const field = body.slice(0, 64);
+  const addrHex = '0x' + field.slice(24);
+  return addrHex.toLowerCase();
+}
+
+// decimals()
+async function readDecimals(tokenAddr: string): Promise<number> {
+  const data = '0x313ce567';
+  const hex = await ethCallRaw(tokenAddr, data);
+  const body = hex.replace(/^0x/, '');
+  if (body.length < 64) return 18;
+
+  const field = '0x' + body.slice(0, 64);
+  try {
+    const n = Number(BigInt(field));
+    if (!Number.isFinite(n) || n <= 0 || n > 36) return 18;
+    return n;
+  } catch {
+    return 18;
+  }
+}
+
+// Uniswap V2 style getReserves()
+async function readReserves(
+  pairAddr: string,
+): Promise<{ reserve0: bigint; reserve1: bigint }> {
+  const data = '0x0902f1ac';
+  const hex = await ethCallRaw(pairAddr, data);
+  const body = hex.replace(/^0x/, '');
+
+   if (body.length < 64 * 2) {
+    return { reserve0: BIGINT_ZERO, reserve1: BIGINT_ZERO };
+  }
+
+
+  const r0Hex = '0x' + body.slice(0, 64);
+  const r1Hex = '0x' + body.slice(64, 128);
+
+  return {
+    reserve0: hexToBigInt(r0Hex),
+    reserve1: hexToBigInt(r1Hex),
+  };
+}
+
 type TokenHolding = {
   address: string;
   symbol: string;
+  name?: string;
   decimals: number;
   rawBalance: string;
   balance: number;
   priceUsd?: number;
   valueUsd?: number;
   iconUrl?: string;
+  lpBreakdown?: {
+    token0Symbol: string;
+    token1Symbol: string;
+    amount0: number;
+    amount1: number;
+  };
 };
+
+
+type VaultPosition = {
+  tokenAddress: string;
+  symbol: string;
+  protocol: string;
+  poolName: string;
+  amount: number;
+  depositedUsd: number;
+  rewardsUsd?: number;
+  apr?: number;
+  lpBreakdown?: {
+    token0Symbol: string;
+    token1Symbol: string;
+    amount0: number;
+    amount1: number;
+  };
+};
+
+async function fetchTokenSymbol(addr: string): Promise<string> {
+  try {
+    const res = await fetch(`${BLOCKSCOUT_BASE}/tokens/${addr}`);
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data?.symbol || '';
+  } catch {
+    return '';
+  }
+}
+
+function guessVaultFromToken(
+  t: TokenHolding,
+): { protocol: string; pool: string } | null {
+    // if backend already decomposed it as an LP, treat as yielding
+  if (t.lpBreakdown) {
+    const poolLabel = t.name || t.symbol || 'LP position';
+
+    return {
+      protocol: 'Onchain',
+      pool: poolLabel,
+    };
+  }
+
+  const sym = (t.symbol || '').toUpperCase();
+  const nm = (t.name || '').toUpperCase();
+  const combined = `${sym} ${nm}`;
+
+  // liquid staked ETH wrappers on Ink - treat as yielding
+  if (nm.includes('IETH') || sym === 'IET') {
+    return { protocol: 'Onchain', pool: 'iETH' };
+  }
+
+  if (nm.includes('ULTRAETH') || sym === 'ULT') {
+    return { protocol: 'Onchain', pool: 'ultraETH' };
+  }
+
+  // AMM and v2 style LPs - sAMMV2, vAMMV2, UNI-V2 etc
+  if (
+    combined.includes('AMMV2') ||
+    combined.includes('SAMMV2') ||
+    combined.includes('VAMMV2') ||
+    combined.includes('UNI-V2') ||
+    combined.includes(' V2 ')
+  ) {
+    return { protocol: 'Onchain', pool: nm || sym || 'LP position' };
+  }
+
+  // generic LP / pool tokens
+  if (sym.includes('LP') || nm.includes('LP TOKEN') || nm.includes('LIQUIDITY')) {
+    return { protocol: 'Onchain', pool: 'LP position' };
+  }
+
+  // ink specific hints - tweak anytime
+  if (sym.includes('HYDRO') || nm.includes('HYDRO')) {
+    return { protocol: 'Hydrothermal', pool: 'Vault' };
+  }
+
+  if (sym.includes('DCA') || nm.includes('DCA')) {
+    return { protocol: 'InkDCA', pool: 'Vault' };
+  }
+
+  // generic staked wrappers
+  if (sym.startsWith('STK') || (sym.startsWith('S') && sym.includes('STK'))) {
+    return { protocol: 'Staked', pool: 'Staking' };
+  }
+
+  return null;
+}
 
 async function getNativeBalance(address: string): Promise<number> {
   try {
@@ -65,6 +270,7 @@ async function fetchErc20Tokens(address: string): Promise<TokenHolding[]> {
 
     return data.items.map((item: any) => {
       const token = item.token || {};
+      const name = String(token.name || '');
       const raw = String(item.value ?? '0');
       const decimals = Number(token.decimals ?? 18);
 
@@ -77,33 +283,37 @@ async function fetchErc20Tokens(address: string): Promise<TokenHolding[]> {
         balance = 0;
       }
 
-      const rawAddr =
-        token.address ||
-        token.address_hash ||
-        token.contractAddress ||
-        item.token_address ||
-        item.address ||
-        item.contract_address ||
-        '';
+const rawAddr =
+  token.address ||
+  token.address_hash ||
+  token.contractAddress ||
+  item.token_address ||
+  item.address ||
+  item.contract_address ||
+  '';
 
-      let addr = String(rawAddr).toLowerCase();
-      const symbol = String(token.symbol || '');
+let addr = String(rawAddr).toLowerCase();
+const symbol = String(token.symbol || '');
+const tokenName = String(token.name || '');
 
-      const iconUrl =
-        typeof token.icon_url === 'string' ? token.icon_url : '';
+const iconUrl =
+  typeof token.icon_url === 'string' ? token.icon_url : '';
+
 
       if (!addr && symbol.toUpperCase() === 'ANITA') {
         addr = '0x0606fc632ee812ba970af72f8489baaa443c4b98'.toLowerCase();
       }
 
-      return {
-        address: addr,
-        symbol,
-        decimals,
-        rawBalance: raw,
-        balance,
-        iconUrl,
-      };
+return {
+  address: addr,
+  symbol,
+  name: tokenName,
+  decimals,
+  rawBalance: raw,
+  balance,
+  iconUrl,
+};
+
     });
   } catch (err) {
     console.error('blockscout fetch failed', err);
@@ -177,6 +387,155 @@ async function getTokenMarketData(address: string): Promise<TokenMarketData> {
   }
 }
 
+function looksLikeLpToken(t: TokenHolding): boolean {
+  const sym = (t.symbol || '').toUpperCase();
+  const nm = (t.name || '').toUpperCase();
+  const combined = `${sym} ${nm}`;
+
+  const isLp =
+    combined.includes('AMMV2') ||
+    combined.includes('SAMMV2') ||
+    combined.includes('VAMMV2') ||
+    combined.includes('UNI-V2') ||
+    combined.includes(' LP') ||
+    combined.includes('-LP') ||
+    combined.includes(' LIQUIDITY') ||
+    combined.includes(' POOL');
+
+  if (isLp) {
+    console.log('LP DETECTED:', t.symbol, t.name, t.address);
+  } else {
+    console.log('NOT LP:', t.symbol, t.name);
+  }
+
+  return isLp;
+}
+
+// override LP token value with underlying pool assets, fully automatic
+async function applyLpDecompositionAuto(
+  tokens: TokenHolding[],
+  priceMap: Record<string, number>,
+): Promise<TokenHolding[]> {
+  const out: TokenHolding[] = [];
+
+  for (const t of tokens) {
+    if (!t.address || !looksLikeLpToken(t)) {
+      out.push(t);
+      continue;
+    }
+
+    const pairAddr = t.address.toLowerCase();
+
+    let userLp: bigint;
+    try {
+      userLp = BigInt(t.rawBalance || '0');
+    } catch {
+      out.push(t);
+      continue;
+    }
+   if (userLp === BigInt(0)) {
+      out.push(t);
+      continue;
+    }
+
+    // try to read pair info, if any call fails just keep original token
+    const [token0Addr, token1Addr] = await Promise.all([
+      readToken0(pairAddr),
+      readToken1(pairAddr),
+    ]);
+
+    if (!token0Addr || !token1Addr) {
+      out.push(t);
+      continue;
+    }
+
+    const [dec0, dec1] = await Promise.all([
+      readDecimals(token0Addr),
+      readDecimals(token1Addr),
+    ]);
+
+    const [totalSupply, { reserve0, reserve1 }] = await Promise.all([
+      readTotalSupply(pairAddr),
+      readReserves(pairAddr),
+    ]);
+
+if (totalSupply === BIGINT_ZERO) {
+  out.push(t);
+  continue;
+}
+
+
+    const share = Number(userLp) / Number(totalSupply);
+    if (!Number.isFinite(share) || share <= 0) {
+      out.push(t);
+      continue;
+    }
+
+    const amount0 = (Number(reserve0) / 10 ** dec0) * share;
+    const amount1 = (Number(reserve1) / 10 ** dec1) * share;
+
+    const addr0 = token0Addr.toLowerCase();
+    const addr1 = token1Addr.toLowerCase();
+
+    let price0 = priceMap[addr0] || 0;
+    let price1 = priceMap[addr1] || 0;
+
+    if (!price0) {
+      const m0 = await getTokenMarketData(addr0);
+      price0 = m0.priceUsd || 0;
+      if (price0) priceMap[addr0] = price0;
+    }
+
+    if (!price1) {
+      const m1 = await getTokenMarketData(addr1);
+      price1 = m1.priceUsd || 0;
+      if (price1) priceMap[addr1] = price1;
+    }
+
+    const valueUsd = amount0 * price0 + amount1 * price1;
+
+    // choose best label for underlying tokens
+    // prefer symbol if it contains a '/', since that usually has 'TOKEN0/TOKEN1'
+    const symbolLabel = (t.symbol || '').trim();
+    const nameLabel = (t.name || '').trim();
+
+    let labelForTokens = '';
+    if (symbolLabel.includes('/')) {
+      labelForTokens = symbolLabel;
+    } else if (nameLabel.includes('/')) {
+      labelForTokens = nameLabel;
+    } else {
+      labelForTokens = symbolLabel || nameLabel;
+    }
+
+    const rawPoolLabel = nameLabel || symbolLabel || 'LP position';
+
+// fetch real token symbols from blockscout
+const [sym0, sym1] = await Promise.all([
+  fetchTokenSymbol(addr0),
+  fetchTokenSymbol(addr1),
+]);
+
+
+    const poolLabel = rawPoolLabel || 'LP position';
+
+    out.push({
+      ...t,
+      valueUsd,
+      name: poolLabel,
+      lpBreakdown: {
+        token0Symbol: sym0,
+        token1Symbol: sym1,
+        amount0,
+        amount1,
+      },
+    });
+  }
+
+  return out;
+}
+
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -189,11 +548,17 @@ export async function GET(req: Request) {
       );
     }
 
-    const [nativeInk, tokens, ethUsd] = await Promise.all([
-      getNativeBalance(wallet),
-      fetchErc20Tokens(wallet),
-      getEthUsdPrice(),
-    ]);
+const [nativeInk, tokens, ethUsd] = await Promise.all([
+  getNativeBalance(wallet),
+  fetchErc20Tokens(wallet),
+  getEthUsdPrice(),
+]);
+
+console.log(
+  'TOKENS FROM BLOCKSCOUT ===>',
+  JSON.stringify(tokens, null, 2),
+);
+
 
     const stableSymbols = new Set([
       'USDC',
@@ -228,41 +593,79 @@ export async function GET(req: Request) {
       }
     });
 
-    const pricedTokens: TokenHolding[] = tokens.map((t) => {
-      const upper = t.symbol.toUpperCase();
-      let price = priceMap[t.address] || 0;
+let pricedTokens: TokenHolding[] = tokens.map((t) => {
+const upper = (t.symbol || '').toUpperCase();
+  let price = priceMap[t.address] || 0;
 
-      if (stableSymbols.has(upper) && price === 0) {
-        price = 1;
+  if (stableSymbols.has(upper) && price === 0) {
+    price = 1;
+  }
+
+  const value = price > 0 ? t.balance * price : 0;
+
+  const iconUrl =
+    t.iconUrl && t.iconUrl.length > 0
+      ? t.iconUrl
+      : logoMap[t.address] || undefined;
+
+  return {
+    ...t,
+    priceUsd: price,
+    valueUsd: value,
+    iconUrl,
+  };
+});
+
+// override LP token value with underlying pool amounts when known
+pricedTokens = await applyLpDecompositionAuto(pricedTokens, priceMap);
+
+
+    // auto-split tokens into spot vs yielding based on symbol and name
+    const vaults: VaultPosition[] = [];
+    const spotTokens: TokenHolding[] = [];
+
+    for (const t of pricedTokens) {
+      const hint = guessVaultFromToken(t);
+
+      if (hint && t.balance > 0) {
+        const price = t.priceUsd ?? 0;
+        const valueUsd =
+          t.valueUsd != null ? t.valueUsd : price * t.balance;
+
+        vaults.push({
+          tokenAddress: t.address,
+          symbol: t.symbol,
+          protocol: hint.protocol,
+          poolName: hint.pool,
+          amount: t.balance,
+          depositedUsd: valueUsd,
+          rewardsUsd: 0,
+          lpBreakdown: t.lpBreakdown,
+        });
+      } else {
+        spotTokens.push(t);
       }
+    }
 
-      const value = price > 0 ? t.balance * price : 0;
 
-      const iconUrl =
-        t.iconUrl && t.iconUrl.length > 0
-          ? t.iconUrl
-          : logoMap[t.address] || undefined;
 
-      return {
-        ...t,
-        priceUsd: price,
-        valueUsd: value,
-        iconUrl,
-      };
-    });
-
-    const stablesUsd = pricedTokens
+    const stablesUsd = spotTokens
       .filter((t) => stableSymbols.has(t.symbol.toUpperCase()))
       .reduce((sum, t) => sum + (t.valueUsd || 0), 0);
 
     const nativeUsd = nativeInk * ethUsd;
 
-    const tokensUsd = pricedTokens.reduce(
+    const tokensUsd = spotTokens.reduce(
       (sum, t) => sum + (t.valueUsd || 0),
       0,
     );
 
-    const totalValueUsd = nativeUsd + tokensUsd;
+    const vaultDepositsUsd = vaults.reduce(
+      (sum, v) => sum + (v.depositedUsd || 0),
+      0,
+    );
+
+    const totalValueUsd = nativeUsd + tokensUsd + vaultDepositsUsd;
 
     const portfolio = {
       mock: false,
@@ -273,11 +676,14 @@ export async function GET(req: Request) {
         stables: stablesUsd,
         lpTokens: 0,
       },
-      vaults: [],
-      vaultDepositsUsd: 0,
+      vaults,
+      vaultDepositsUsd,
       unclaimedYieldUsd: 0,
-      tokens: pricedTokens,
+      tokens: spotTokens,
     };
+
+
+
 
     return NextResponse.json(portfolio);
   } catch (err) {
