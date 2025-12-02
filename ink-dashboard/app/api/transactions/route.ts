@@ -2,6 +2,22 @@ import { NextResponse } from 'next/server'
 
 const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2'
 
+// known app labels by contract address (ALL LOWERCASE)
+const KNOWN_APPS: Record<string, string> = {
+  // inkyPump
+  '0x1d74317d760f2c72a94386f50e8d10f2c902b899': 'InkyPump',
+
+  // across ink spoke pool
+  '0xef684c38f94f48775959ecf2012d7e864ffb9dd4': 'Across V2',
+
+    // Nado Ink
+  '0x05ec92d78ed421f3d3ada77ffde167106565974e': 'Nado',
+
+  // fill with real ones later
+  // '0xuni_router_address_here': 'inkySwap',
+  // '0xsuperswap_router_here': 'SuperSwap',
+}
+
 type TxToken = {
   symbol: string
   address: string
@@ -21,13 +37,51 @@ type TxItem = {
   hasNft: boolean
   status: string
   tokens: TxToken[]
+  toLabel: string   // label of interacted contract / app
 }
+
+// ---------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------
 
 function addr(x: any): string {
   if (!x) return ''
   if (typeof x === 'string') return x.toLowerCase()
   if (typeof x.hash === 'string') return x.hash.toLowerCase()
+  if (typeof x.address_hash === 'string') return x.address_hash.toLowerCase()
+  if (typeof x.address === 'string') return x.address.toLowerCase()
   return ''
+}
+
+function labelOf(x: any): string {
+  if (!x) return ''
+
+  // if they passed an address string
+  if (typeof x === 'string') {
+    const a = x.toLowerCase()
+    if (KNOWN_APPS[a]) return KNOWN_APPS[a]
+    return x
+  }
+
+  const a = x as any
+  const aAddr = addr(a)
+
+  // known app override
+  if (aAddr && KNOWN_APPS[aAddr]) {
+    return KNOWN_APPS[aAddr]
+  }
+
+  return (
+    a.name ||
+    a.smart_contract?.name ||
+    a.ens_domain_name ||
+    a.ens_domain?.name ||
+    a.label ||
+    a.token?.name ||
+    a.hash ||
+    a.address ||
+    ''
+  )
 }
 
 let cachedEthUsd = 0
@@ -40,9 +94,7 @@ async function fetchEthUsd(): Promise<number> {
       return cachedEthUsd
     }
 
-    const res = await fetch(
-      'https://api.coinbase.com/v2/prices/ETH-USD/spot'
-    )
+    const res = await fetch('https://api.coinbase.com/v2/prices/ETH-USD/spot')
     const json = await res.json()
     const val = Number(json?.data?.amount || 0) || 0
     if (val > 0) {
@@ -67,10 +119,7 @@ function extractArray(json: any): any[] {
 }
 
 // follow Blockscout next_page_params to fetch all pages
-async function fetchAllPages(
-  path: string,
-  maxItems = 2000
-): Promise<any[]> {
+async function fetchAllPages(path: string, maxItems = 2000): Promise<any[]> {
   const all: any[] = []
   let url = `${BLOCKSCOUT_BASE}${path}?items_count=50`
   let safety = 0
@@ -86,11 +135,7 @@ async function fetchAllPages(
     all.push(...pageItems)
 
     const next = (json as any).next_page_params
-    if (
-      !next ||
-      typeof next !== 'object' ||
-      Object.keys(next).length === 0
-    ) {
+    if (!next || typeof next !== 'object' || Object.keys(next).length === 0) {
       break
     }
 
@@ -108,12 +153,15 @@ async function fetchAllPages(
   return all
 }
 
+// ---------------------------------------------------------------------
+// GET
+// ---------------------------------------------------------------------
+
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const wallet = url.searchParams.get('wallet')
   const pageParam = url.searchParams.get('page')
 
-  // token filter from query
   const tokenFilterRaw =
     url.searchParams.get('token') ||
     url.searchParams.get('tokenSymbol') ||
@@ -128,6 +176,7 @@ export async function GET(req: Request) {
       hasMore: false,
       txs: [] as TxItem[],
       tokens: [] as TxToken[],
+      nativeUsdPrice: 0,
     })
   }
 
@@ -161,33 +210,25 @@ export async function GET(req: Request) {
       txByHash[h] = tx
     }
 
-    // add synthetic base txs for transfer only hashes
+    // add synthetic base txs for transfer-only hashes
     for (const [hashLc, list] of Object.entries(transfersByTx)) {
       if (txByHash[hashLc]) continue
 
       const first = list[0]
       txByHash[hashLc] = {
-        hash:
-          first.tx_hash ||
-          first.transaction_hash ||
-          first.hash ||
-          hashLc,
+        hash: first.tx_hash || first.transaction_hash || first.hash || hashLc,
         from: first.from,
         to: first.to,
-        timestamp:
-          first.timestamp ??
-          first.time ??
-          first.block_timestamp ??
-          null,
+        timestamp: first.timestamp ?? first.time ?? first.block_timestamp ?? null,
         value: 0,
         fee: 0,
         status: 'ok',
       }
     }
 
-    // build array from union and sort by time desc
     const baseTxs: any[] = Object.values(txByHash)
 
+    // sort desc by time
     baseTxs.sort((a, b) => {
       const aRaw = a.timestamp ?? a.time ?? a.block_timestamp ?? 0
       const bRaw = b.timestamp ?? b.time ?? b.block_timestamp ?? 0
@@ -208,13 +249,16 @@ export async function GET(req: Request) {
       return bTs - aTs
     })
 
-    // build all txs from baseTxs
+    // build all txs
     const allTxs: TxItem[] = baseTxs.map((tx: any) => {
       const hash = String(tx.hash || tx.tx_hash || '')
       const hashLc = hash.toLowerCase()
 
-      const from = addr(tx.from)
-      const to = addr(tx.to)
+      const fromObj = tx.from
+      const toObj = tx.to
+
+      const from = addr(fromObj)
+      const to = addr(toObj)
 
       let direction: 'in' | 'out' | 'self' = 'out'
       if (from === addrLc && to === addrLc) direction = 'self'
@@ -240,7 +284,25 @@ export async function GET(req: Request) {
       const gasFeeInk = Number(feeRaw) / 1e18
       const gasFeeUsd = ethUsd > 0 ? gasFeeInk * ethUsd : 0
 
-      const status = tx.status || tx.tx_status || 'ok'
+const status = tx.status || tx.tx_status || 'ok'
+
+// extract method name if available
+let method =
+  tx.method ||
+  tx.call_method ||
+  tx.input_method ||
+  (tx.decoded_input?.name) ||
+  (tx.decoded?.method) ||
+  ''
+
+// fallback method if Blockscout does not provide one
+if (!method) {
+  if (direction === 'in') method = 'receive'
+  else if (direction === 'out') method = 'send'
+  else method = 'self'
+}
+
+
 
       const list = transfersByTx[hashLc] || []
       const outParts: string[] = []
@@ -257,29 +319,55 @@ export async function GET(req: Request) {
         else if (toT === addrLc) dir = 'in'
         else dir = 'out'
 
-        const typeRaw = String(
-          tr.type || tr.token_type || tr.token?.type || ''
-        ).toUpperCase()
+const typeRaw = tr.token?.type?.toUpperCase() || ''
 
-        const isNft = typeRaw.includes('721') || typeRaw.includes('1155')
-        if (isNft) hasNft = true
+const isNft =
+  typeRaw.includes('721') ||
+  typeRaw.includes('1155') ||
+  tr.token_id != null ||
+  tr.tokenId != null ||
+  tr.id != null
 
-        const tokenAddr = String(
-          tr.token?.address_hash ||
-            tr.token?.address ||
-            tr.contract_address ||
-            tr.token_address ||
-            tr.contract?.address ||
-            ''
-        ).toLowerCase()
+if (isNft) hasNft = true
 
-        const symbol = tr.token?.symbol || 'TOKEN'
+
+// FIX: normalize and catch ALL possible address fields
+const tokenAddr =
+  (
+    tr.token?.address_hash ||
+    tr.token?.address ||
+    tr.token_address ||
+    tr.contract_address ||
+    tr.contract?.address ||
+    tr.raw_token_address ||
+    ''
+  )
+    ?.toString()
+    .trim()
+    .toLowerCase();
+
+
+        const symbol = tr.token?.symbol || 'NFT'
+let id =
+  tr.token_id ??
+  tr.token?.token_id ??
+  tr.token?.id ??
+  tr.id ??
+  tr.tokenId ??
+  tr.total?.id ??
+  tr.value?.id ??
+  '';
+
+id = id ? String(id).trim() : '';
+
+
         if (tokenAddr) {
-          tokenMap[tokenAddr] = {
-            symbol,
-            address: tokenAddr,
-          }
-        }
+          tokenMap[tokenAddr + id] = {
+              symbol: isNft ? `${symbol} #${id}` : symbol,
+                  address: tokenAddr,
+                    }
+                    }
+
 
         const decimals = Number(tr.token?.decimals ?? 18)
         const rawAmount =
@@ -291,12 +379,22 @@ export async function GET(req: Request) {
 
         let part = ''
 
-        if (isNft) {
-          const id = tr.token_id ?? tr.id ?? tr.tokenId ?? ''
-          if (dir === 'out') part = `Sent ${symbol} #${id}`
-          else if (dir === 'in') part = `Received ${symbol} #${id}`
-          else part = `${symbol} #${id}`
-        } else {
+if (isNft) {
+  const id = tr.token_id ?? tr.id ?? tr.tokenId ?? ''
+
+  if (dir === 'out') {
+    // nft sent
+    part = `- ${symbol} #${id}`
+  } else if (dir === 'in') {
+    // nft received
+    part = `+ ${symbol} #${id}`
+  } else {
+    part = `${symbol} #${id}`
+  }
+}
+
+        
+          else {
           const denom = decimals > 0 ? Math.pow(10, decimals) : 1
           const amt = Number(rawAmount) / denom
           if (!amt || !isFinite(amt)) continue
@@ -313,7 +411,25 @@ export async function GET(req: Request) {
         else if (dir === 'in') inParts.push(part)
       }
 
+      // add native coin leg if tx has non-zero value
+      if (valueInk && isFinite(valueInk)) {
+        const nativeSymbol = 'ETH' // or 'INK'
+        const amtStrNative =
+          Math.abs(valueInk) >= 1
+            ? valueInk.toFixed(4)
+            : valueInk.toFixed(8)
+
+        if (direction === 'out') {
+          outParts.unshift(`Sent ${parseFloat(amtStrNative)} ${nativeSymbol}`)
+        } else if (direction === 'in') {
+          inParts.unshift(
+            `Received ${parseFloat(amtStrNative)} ${nativeSymbol}`
+          )
+        }
+      }
+
       let details = [...outParts, ...inParts].join('; ')
+
 
       // approvals - if no token transfers but method looks like approve, attach token by contract address
       if (Object.keys(tokenMap).length === 0) {
@@ -347,6 +463,30 @@ export async function GET(req: Request) {
 
       const tokens = Object.values(tokenMap)
 
+      // -------- pick the "interacted contract" side (this is the fix) -----
+      const looksContract = (side: any) =>
+        !!(
+          side?.smart_contract ||
+          side?.is_contract ||
+          side?.contract_type ||
+          side?.token
+        )
+
+      let interactedSide: any = null
+      if (looksContract(toObj)) interactedSide = toObj
+      else if (looksContract(fromObj)) interactedSide = fromObj
+
+      let toLabel = ''
+      if (interactedSide) {
+        toLabel = labelOf(interactedSide)
+      } else {
+        // fallback: if we sent, contract is usually `to`; if we received, usually `from`
+        toLabel =
+          direction === 'out'
+            ? labelOf(toObj || to)
+            : labelOf(fromObj || from)
+      }
+
       return {
         hash,
         timestamp: ts,
@@ -361,6 +501,8 @@ export async function GET(req: Request) {
         hasNft,
         status,
         tokens,
+        toLabel,
+        method,   // ← add this
       }
     })
 
@@ -393,17 +535,14 @@ export async function GET(req: Request) {
           const addrLcToken = (t.address || '').toLowerCase()
 
           if (isAddress) {
-            // searched by contract, match address only
             return addrLcToken === tf
           }
 
-          // fallback: searched by symbol
           return symLc === tf
         })
       )
     }
 
-    // paginate after filtering
     const total = filteredTxs.length
     const start = (page - 1) * pageSize
     const end = start + pageSize
@@ -416,6 +555,7 @@ export async function GET(req: Request) {
       hasMore,
       txs: slice,
       tokens: allTokens,
+      nativeUsdPrice: ethUsd,
     })
   } catch (e) {
     console.error('transactions fetch crashed', e)
@@ -425,6 +565,7 @@ export async function GET(req: Request) {
       hasMore: false,
       txs: [] as TxItem[],
       tokens: [] as TxToken[],
+      nativeUsdPrice: 0,
     })
   }
 }

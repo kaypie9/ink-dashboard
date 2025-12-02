@@ -16,6 +16,27 @@ import {
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 
+
+  // ADD MORE
+const PLATFORM_ICONS: Record<string, string> = {
+  // inkypump
+  '0x1d74317d760f2c72a94386f50e8d10f2c902b899': 'inkypump',
+
+  // across
+  '': 'across',
+
+  // Nado
+  '0x05ec92d78ed421f3d3ada77ffde167106565974e': 'Nado',
+  // add more later here...
+
+  // Li.fi
+  '0x864b314d4c5a0399368609581d3e8933a63b9232': 'lifi',
+  '0x1bcd304fdad1d1d66529159b1bc8d13c9158d586': 'lifi',
+
+    // dailygm
+  '0x9f500d075118272b3564ac6ef2c70a9067fd2d3f': 'dailygm',
+}
+
 // svg footer - step style X icon
 const TwitterIconSvg = () => (
   <svg
@@ -137,6 +158,8 @@ type TxItem = {
   hasNft: boolean;
   status: string;
   tokens: TxToken[];
+  method?: string;    // add this
+  toLabel?: string;   // keep this
 };
 
 
@@ -173,14 +196,14 @@ function isSpamToken(t: TokenHolding): boolean {
 }
 
 
-function formatDateLabel(t: number) {
-  const d = new Date(t);
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function shortAddress(addr: string) {
+  if (!addr) return ''
+  const a = addr.toLowerCase()
+  if (a.length <= 10) return a
+  return `${a.slice(0, 6)}…${a.slice(-4)}`
 }
+
+
 
 function formatDateTimeLabel(t: number) {
   const d = new Date(t);
@@ -235,6 +258,50 @@ type PortfolioResponse = {
   unclaimedYieldUsd: number;
   tokens: TokenHolding[];
 };
+
+type TxLeg = {
+  direction: "in" | "out"; // in = received, out = sent
+  amount: number | null;
+  symbol: string;
+};
+
+function parseTxDetails(details: string | undefined): TxLeg[] {
+  if (!details) return [];
+
+  const legs: TxLeg[] = [];
+
+  // 1) normal tokens / native coin: "Sent 0.1 ANITA"
+  const re = /(Sent|Received)\s+([\d.,]+)\s+([A-Za-z0-9]+)\b/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(details)) !== null) {
+    const dir = m[1] === "Sent" ? "out" : "in";
+    const amt = parseFloat(m[2].replace(/,/g, ""));
+    const sym = m[3];
+    legs.push({
+      direction: dir,
+      amount: Number.isFinite(amt) ? amt : null,
+      symbol: sym,
+    });
+  }
+
+  // 2) NFTs: backend sends "Sent INKBunnies #1234"
+  // here we treat it as "+1 INKBunnies" (or "-1 INKBunnies")
+  const reNft = /(Sent|Received)\s+([A-Za-z0-9]+)\s+#\d+/g;
+
+  while ((m = reNft.exec(details)) !== null) {
+    const dir = m[1] === "Sent" ? "out" : "in";
+    const sym = m[2];
+    legs.push({
+      direction: dir,
+      amount: 1,
+      symbol: sym,
+    });
+  }
+
+  return legs;
+}
+
 
 export default function HomePage() {
   const [activePage, setActivePage] = useState<PageKey>("Home");
@@ -291,18 +358,22 @@ const [txHasMore, setTxHasMore] = useState(false);
 const [txTokenDropdownOpen, setTxTokenDropdownOpen] = useState(false);
 
 const [txTokenOptions, setTxTokenOptions] = useState<TxToken[]>([]);
-const [txCompact, setTxCompact] = useState(false);
+
+const [nativeUsdPrice, setNativeUsdPrice] = useState(0);
 
 
 // try to get token icon from backend that proxies Dexscreener
 const fetchDexIcon = async (address: string) => {
   if (!address) return;
-  if (tokenIcons[address]) return;
+
+  const key = address.toLowerCase();
+  if (tokenIcons[key]) return;
 
   try {
     const res = await fetch(
       `/api/token-icon?address=${encodeURIComponent(address)}`
     );
+
 
     if (!res.ok) {
       console.error('token-icon api failed', res.status);
@@ -316,8 +387,9 @@ const fetchDexIcon = async (address: string) => {
     const icon = data.iconUrl as string;
 
     setTokenIcons(prev =>
-      prev[address] ? prev : { ...prev, [address]: icon }
+      prev[key] ? prev : { ...prev, [key]: icon }
     );
+
   } catch (e) {
     console.error('token-icon api crashed', e);
   }
@@ -346,10 +418,14 @@ if (data?.tokens?.length) {
   data.tokens.forEach((t) => {
     if (!t.address) return;
     if (t.iconUrl) return;
-    if (tokenIcons[t.address]) return;
+
+    const key = t.address.toLowerCase();
+    if (tokenIcons[key]) return;
+
     fetchDexIcon(t.address);
   });
 }
+
 
     return data;
   } catch (err) {
@@ -491,6 +567,12 @@ const loadTransactions = async (addr: string, page: number) => {
 
     setTxHasMore(!!json.hasMore);
 
+    // new: store native usd price coming from api
+if (typeof json.nativeUsdPrice === 'number') {
+  setNativeUsdPrice(json.nativeUsdPrice);
+}
+
+
     setTxs(prev => (page === 1 ? list : [...prev, ...list]));
 
     if (Array.isArray(json.tokens)) {
@@ -518,24 +600,6 @@ const loadTransactions = async (addr: string, page: number) => {
     setIsLoadingTxs(false);
   }
 };
-
-
-
-
-
-const refreshTransactions = () => {
-  if (!walletAddress) return;
-
-  // reset paging and list, then reload page 1
-  setTxPage(1);
-  setTxHasMore(false);
-  setTxs([]);
-
-  loadTransactions(walletAddress, 1);
-};
-
-
-
 
 // when wallet changes, reset tx state and hydrate from cache if present
 useEffect(() => {
@@ -798,10 +862,16 @@ const explorerTxUrl = walletAddress
   useEffect(() => {
     txTokenOptions.forEach((tok) => {
       if (!tok.address) return;
-      if (tokenIcons[tok.address]) return;
+
+      const key = tok.address.toLowerCase();
+      if (tokenIcons[key]) return;
+
       fetchDexIcon(tok.address);
     });
   }, [txTokenOptions, tokenIcons]);
+
+
+
 
 // suggestions based on query
 const txTokenSuggestions = useMemo(() => {
@@ -817,6 +887,18 @@ const txTokenSuggestions = useMemo(() => {
   });
 }, [txTokenOptions, txTokenQuery]);
 
+const tokenPriceMap = useMemo(() => {
+  const m: Record<string, number> = {};
+  if (portfolio?.tokens) {
+    portfolio.tokens.forEach((t) => {
+      if (t.address && t.priceUsd != null) {
+        m[t.address.toLowerCase()] = t.priceUsd;
+      }
+    });
+  }
+  return m;
+}, [portfolio]);
+
 
 // final filtered transactions
 const filteredTxs = useMemo(() => {
@@ -829,6 +911,18 @@ const filteredTxs = useMemo(() => {
     )
   );
 }, [txs, txSelectedToken]);
+
+// auto-load icons for tokens that appear only inside txs
+useEffect(() => {
+  filteredTxs.forEach(tx => {
+    tx.tokens.forEach(t => {
+      const addr = t.address?.toLowerCase();
+      if (addr && !tokenIcons[addr]) {
+        fetchDexIcon(addr);
+      }
+    });
+  });
+}, [filteredTxs]);
 
 const showTxFullLoader = isLoadingTxs && txPage === 1;
 
@@ -1566,9 +1660,10 @@ const value = t.valueUsd ?? price * t.balance
             >
               <span className="col-token">
                 <span className="token-icon">
-                  {t.iconUrl || tokenIcons[t.address] ? (
-                    <img
-                      src={t.iconUrl || tokenIcons[t.address]}
+{t.iconUrl || tokenIcons[t.address.toLowerCase()] ? (
+  <img
+    src={t.iconUrl || tokenIcons[t.address.toLowerCase()]}
+
                       alt={t.symbol || "token"}
                       className="token-icon-img"
                     />
@@ -1890,30 +1985,8 @@ return (
     {/* TAB 4: transactions */}
 {positionsTab === "transactions" && (
   <div
-    className={`positions-table tx-table ${
-      txCompact ? "tx-compact" : ""
-    }`}
+className="positions-table tx-table"
   >
-
-    {/* toolbar */}
-    <div className="tx-toolbar">
-      <button
-        type="button"
-        className={`tx-compact-toggle ${txCompact ? "on" : ""}`}
-        onClick={() => setTxCompact((prev) => !prev)}
-      >
-        compact mode
-      </button>
-
-      <button
-        type="button"
-        className="tx-refresh-btn"
-        onClick={refreshTransactions}
-        disabled={isLoadingTxs || !walletAddress}
-      >
-        refresh transactions
-      </button>
-    </div>
 
     {/* filter input */}
     <div
@@ -1993,44 +2066,54 @@ return (
         </button>
       )}
 
-      {txTokenDropdownOpen && txTokenSuggestions.length > 0 && (
-        <div className="tx-token-dropdown">
-          {txTokenSuggestions.map((tok) => (
-            <button
-              key={tok.address}
-              type="button"
-              className="tx-token-item"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setTxSelectedToken(tok);
-                setTxTokenQuery(tok.symbol || tok.address);
-                setTxTokenDropdownOpen(false);
-                setTxPage(1);
-                setTxHasMore(false);
-              }}
-            >
-              <span className="tx-token-avatar">
-                {tokenIcons[tok.address] ? (
-                  <img
-                    src={tokenIcons[tok.address]}
-                    alt={tok.symbol || "token"}
-                    className="tx-token-avatar-img"
-                  />
-                ) : (
-                  (tok.symbol || "?")[0].toUpperCase()
-                )}
-              </span>
+{txTokenDropdownOpen && txTokenSuggestions.length > 0 && (
+  <div className="tx-token-dropdown">
+    {txTokenSuggestions.map((tok) => {
+      const addrKey = tok.address.toLowerCase();
+      const portfolioToken =
+        portfolio?.tokens.find(
+          (t) => t.address && t.address.toLowerCase() === addrKey
+        ) || null;
 
-              <div className="tx-token-meta">
-                <span className="tx-token-symbol">{tok.symbol}</span>
-                <span className="tx-token-address">
-                  {tok.address.slice(0, 6)}...{tok.address.slice(-4)}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      const iconSrc = tokenIcons[addrKey] || portfolioToken?.iconUrl || null;
+
+      return (
+        <button
+          key={tok.address}
+          type="button"
+          className="tx-token-item"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setTxSelectedToken(tok);
+            setTxTokenQuery(tok.symbol || tok.address);
+            setTxTokenDropdownOpen(false);
+            setTxPage(1);
+            setTxHasMore(false);
+          }}
+        >
+          <span className="tx-token-avatar">
+            {iconSrc ? (
+              <img
+                src={iconSrc}
+                alt={tok.symbol || 'token'}
+                className="tx-token-avatar-img"
+              />
+            ) : (
+              (tok.symbol || '?')[0].toUpperCase()
+            )}
+          </span>
+
+          <div className="tx-token-meta">
+            <span className="tx-token-symbol">{tok.symbol}</span>
+            <span className="tx-token-address">
+              {tok.address.slice(0, 6)}...{tok.address.slice(-4)}
+            </span>
+          </div>
+        </button>
+      );
+    })}
+  </div>
+)}
     </div>
 
     {/* FULL PAGE LOADER */}
@@ -2069,15 +2152,98 @@ return (
         )}
 
         {/* rows */}
-        {filteredTxs.map((tx) => {
-          const platform = tx.details?.toLowerCase().includes("swap")
-            ? "inkySwap"
-            : tx.details?.toLowerCase().includes("super")
-            ? "SuperSwap"
-            : "Contract";
+{filteredTxs.map((tx) => {
 
-          return (
-            <div className="positions-row tx-row" key={tx.hash}>
+  const legs = parseTxDetails(tx.details);
+
+  const hasOut = legs.some((l) => l.direction === "out");
+  const hasIn = legs.some((l) => l.direction === "in");
+  const isSwapLike = hasOut && hasIn && legs.length >= 2;
+
+  const allIn = legs.length > 0 && legs.every((l) => l.direction === "in");
+  const allOutOnly = legs.length > 0 && legs.every((l) => l.direction === "out");
+
+  const lowerDetails = (tx.details || "").toLowerCase();
+  const methodName = (tx.method || "").trim();
+
+  const contractName = tx.toLabel || "";
+  const contractNameLower = contractName.toLowerCase();
+
+  const hasGmToken = tx.tokens.some((t) =>
+    (t.symbol || "").toLowerCase().includes("gm")
+  );
+
+  let platformMain = "Contract";
+  let platformSub: string | null = null;
+  let platformClass = "contract";
+
+    // prefer the explorer style "contract name" if we have it
+  let contractDisplay = '';
+
+  if (tx.toLabel && tx.toLabel.trim().length > 0) {
+    const trimmed = tx.toLabel.trim();
+    // if the label itself looks like a raw address, shorten it
+    contractDisplay =
+      trimmed.startsWith('0x') && trimmed.length > 14
+        ? formatAddress(trimmed)
+        : trimmed;
+  } else {
+    contractDisplay = formatAddress(tx.to);
+  }
+
+
+  // gm style app
+  if (
+    methodName.toLowerCase() === "gm" ||
+    lowerDetails.includes("gm") ||
+    contractNameLower.includes("ink gm") ||
+    hasGmToken
+  ) {
+    platformMain = "gm";
+    platformSub = contractName || "Ink GM";
+    platformClass = "app";
+  }
+  // approvals
+  else if (lowerDetails.includes("approve")) {
+    platformMain = methodName || "Approve";
+    const firstSym = tx.tokens[0]?.symbol;
+    platformSub = contractName || firstSym || "Token";
+    platformClass = "approval";
+  }
+  // swaps and routers
+  else if (isSwapLike || lowerDetails.includes("swap")) {
+    platformMain = methodName || "Swap";
+    platformSub = contractName || "DEX trade";
+    platformClass = "swap";
+  }
+  // nft transfers
+  else if (tx.hasNft) {
+    platformMain = "NFT";
+    platformSub = contractName || "Transfer";
+    platformClass = "nft";
+  }
+  // token or native send only
+  else if (allOutOnly) {
+    platformMain = "Send";
+    platformSub = contractName || formatAddress(tx.otherParty);
+    platformClass = "send";
+  }
+  // token or native receive only  airdrops rewards etc
+  else if (allIn) {
+    platformMain = "Receive";
+    platformSub = contractName || formatAddress(tx.otherParty);
+    platformClass = "receive";
+  }
+
+
+
+return (
+  <div
+    className={`positions-row tx-row ${
+      isSwapLike ? "swap-row" : ""
+    }`}
+    key={tx.hash}
+  >
               <span className="col-a">
                 <div>{formatDateTimeLabel(tx.timestamp)}</div>
                 <a
@@ -2090,23 +2256,253 @@ return (
                 </a>
               </span>
 
-              <span className="col-b">
-                <span className="tx-platform-pill">
-                  <span className="tx-platform-icon" />
-                  <span className="tx-platform-label">{platform}</span>
-                </span>
-              </span>
+{/* col B: debank style platform */}
+<span className="col-b">
+  {(() => {
+// Determine which icon to use
+let iconKey = '';
+const toAddr = (tx.to || '').toLowerCase();
+const platformIcon = PLATFORM_ICONS[toAddr];
 
-              <span className="col-c">
-                <div className="tx-title">{tx.details}</div>
-                <div className="tx-moves">
-                  {tx.tokens.slice(0, 3).map((tok) => (
-                    <div key={tok.address} className="tx-move-pill">
-                      {tok.symbol}
-                    </div>
-                  ))}
-                </div>
+// prefer platform icon if we know this contract
+if (platformIcon) {
+  iconKey = platformIcon;
+} else if (platformMain === 'Send') {
+  iconKey = 'send';
+} else if (platformMain === 'Receive') {
+  iconKey = 'receive';
+} else {
+  iconKey = '';
+}
+
+
+
+    return (
+      <div className="tx-platform-block">
+        {/* BIG square icon */}
+        <div className="tx-big-icon-wrapper">
+          {iconKey ? (
+            <img
+              src={`/platforms/${iconKey}.svg`}
+              alt={tx.toLabel}
+              className="tx-big-icon"
+            />
+          ) : (
+            <div className="tx-big-icon tx-big-icon-placeholder"></div>
+          )}
+        </div>
+
+        {/* Texts */}
+        <div className="tx-platform-meta">
+          {/* METHOD */}
+          {tx.method && (
+            <div className="tx-method-text">{tx.method}</div>
+          )}
+
+          {/* PLATFORM NAME — clickable search */}
+          <div
+            className="tx-platform-text"
+            onClick={() => {
+              const trimmed = tx.to?.trim()
+              if (!trimmed) return
+              setSearchInput(trimmed)
+              setWalletAddress(trimmed)
+              setNetWorthHistory([])
+              setHoverIndex(null)
+              setTxPage(1)
+            }}
+            title={tx.to}
+          >
+            {contractDisplay}
+          </div>
+        </div>
+      </div>
+    );
+  })()}
+</span>
+
+
+<span className="col-c">
+  {(() => {
+    const rawLegs = parseTxDetails(tx.details);
+
+    if (rawLegs.length === 0) {
+      return <div className="tx-title">{tx.details}</div>;
+    }
+
+    // group by direction + symbol
+    const groupMap: Record<string, TxLeg> = {};
+
+    for (const leg of rawLegs) {
+      const key =
+        leg.direction + ":" + (leg.symbol || "").toUpperCase();
+
+      if (!groupMap[key]) {
+        groupMap[key] = {
+          direction: leg.direction,
+          amount: leg.amount,
+          symbol: leg.symbol,
+        };
+      } else {
+        const prevAmt = groupMap[key].amount ?? 0;
+        const curAmt = leg.amount ?? 0;
+        groupMap[key].amount = prevAmt + curAmt;
+      }
+    }
+
+    // turn map into array
+    const legs = Object.values(groupMap);
+
+    // outs first, then ins
+    legs.sort((a, b) => {
+      if (a.direction === b.direction) return 0;
+      return a.direction === "out" ? -1 : 1;
+    });
+
+    return (
+      <>
+        {legs.slice(0, 4).map((leg, idx) => {
+          const sign = leg.direction === "out" ? "-" : "+";
+          const lineClass =
+            leg.direction === "out"
+              ? "tx-amount-line tx-out"
+              : "tx-amount-line tx-in";
+
+// 1) always resolve symbol first
+const symbolUpper = (leg.symbol || '').toUpperCase();
+
+// 2) native coin override: ETH / INK always forced
+if (symbolUpper === 'ETH') {
+  const iconSrc = 'https://assets.coingecko.com/coins/images/279/large/ethereum.png';
+  const priceUsd = nativeUsdPrice || undefined;
+  const valueUsd =
+    leg.amount != null && priceUsd != null
+      ? leg.amount * priceUsd
+      : null;
+
+  return (
+    <div key={idx} className={lineClass}>
+      <div className="tx-amount-icon">
+        <img src={iconSrc} alt="ETH" className="tx-amount-icon-img" />
+      </div>
+      <span className="tx-amount-symbol">
+        {sign} {leg.amount?.toFixed(4)} ETH
+        {valueUsd != null ? ` ($${valueUsd.toFixed(2)})` : ''}
+      </span>
+    </div>
+  );
+}
+
+if (symbolUpper === 'INK') {
+  const iconSrc = 'https://explorer.inkonchain.com/images/token.png';
+  const priceUsd = nativeUsdPrice || undefined;
+  const valueUsd =
+    leg.amount != null && priceUsd != null
+      ? leg.amount * priceUsd
+      : null;
+
+  return (
+    <div key={idx} className={lineClass}>
+      <div className="tx-amount-icon">
+        <img src={iconSrc} alt="INK" className="tx-amount-icon-img" />
+      </div>
+      <span className="tx-amount-symbol">
+        {sign} {leg.amount?.toFixed(4)} INK
+        {valueUsd != null ? ` ($${valueUsd.toFixed(2)})` : ''}
+      </span>
+    </div>
+  );
+}
+
+// 3) all other tokens continue normally
+const matchToken =
+  tx.tokens.find(
+    (t) =>
+      (t.symbol || '').toUpperCase() === symbolUpper
+  ) || tx.tokens[idx];
+
+let addrKey = matchToken?.address
+  ? matchToken.address.toLowerCase().trim()
+  : '';
+
+let portfolioToken =
+  portfolio?.tokens.find(
+    (t) => t.address && t.address.toLowerCase() === addrKey
+  ) || null;
+
+// fallback match by symbol if only one
+if (!portfolioToken && leg.symbol && portfolio?.tokens) {
+  const candidates = portfolio.tokens.filter(
+    (t) => (t.symbol || '').toUpperCase() === symbolUpper
+  );
+  if (candidates.length === 1) {
+    portfolioToken = candidates[0];
+    if (!addrKey && portfolioToken.address) {
+      addrKey = portfolioToken.address.toLowerCase();
+    }
+  }
+}
+
+// final icon (non-native)
+const iconSrc =
+  portfolioToken?.iconUrl ||
+  (addrKey && tokenIcons[addrKey]) ||
+  null;
+
+const priceUsd =
+  addrKey && tokenPriceMap[addrKey] != null
+    ? tokenPriceMap[addrKey]
+    : undefined;
+
+const valueUsd =
+  leg.amount != null && priceUsd != null
+    ? leg.amount * priceUsd
+    : null;
+
+
+
+          return (
+            <div key={idx} className={lineClass}>
+              <div className="tx-amount-icon">
+                {iconSrc ? (
+                  <img
+                    src={iconSrc}
+                    alt={leg.symbol || "token"}
+                    className="tx-amount-icon-img"
+                  />
+                ) : (
+                  (leg.symbol || "T")[0].toUpperCase()
+                )}
+              </div>
+
+              <span className="tx-amount-symbol">
+                {sign}{" "}
+                {leg.amount != null ? leg.amount.toFixed(4) : ""}{" "}
+                {leg.symbol}
+                {valueUsd != null
+                  ? ` ($${valueUsd.toFixed(2)})`
+                  : ""}
               </span>
+            </div>
+          );
+        })}
+
+{tx.hasNft && tx.tokens.length > 0 && (
+  <div className="tx-nft-preview real-nft">
+<img
+  src={tokenIcons[tx.tokens[0].address.toLowerCase()] || "/nft.png"}
+      className="tx-nft-img"
+      alt="NFT"
+    />
+    <span className="tx-nft-name">
+      {tx.tokens[0].symbol || "NFT"}
+    </span>
+  </div>
+)}
+      </>
+    );
+  })()}
+</span>
 
               <span className="col-d">
                 {tx.gasFeeInk?.toFixed(6) || "-"}
