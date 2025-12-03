@@ -291,7 +291,7 @@ export async function GET(req: Request) {
       const gasFeeInk = Number(feeRaw) / 1e18
       const gasFeeUsd = ethUsd > 0 ? gasFeeInk * ethUsd : 0
 
-const status = tx.status || tx.tx_status || 'ok'
+const status = String(tx.status || tx.tx_status || 'ok').toLowerCase()
 
 // extract method name if available
 let method =
@@ -527,7 +527,7 @@ if (isNft) {
         gasFeeUsd,
         details,
         hasNft,
-        status,
+        status: (status || 'ok').toLowerCase(),
         tokens,
         toLabel,
         method,

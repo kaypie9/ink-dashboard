@@ -771,38 +771,40 @@ useEffect(() => {
   }, [historyRange, walletAddress]);
 
   // manual refresh: refresh portfolio, write snapshot, reload history
-  const refreshAll = async () => {
-    if (!walletAddress) return;
+const refreshAll = async (addrOverride?: string) => {
+  const addr = addrOverride || walletAddress;
+  if (!addr) return;
 
-    try {
-      setIsRefreshing(true);
+  try {
+    setIsRefreshing(true);
 
-      const data = await loadPortfolio(walletAddress);
-      if (!data) return;
+    const data = await loadPortfolio(addr);
+    if (!data) return;
 
-      const netWorth = data.totalValueUsd ?? 0;
+    const netWorth = data.totalValueUsd ?? 0;
 
-      const res = await fetch("/api/snapshot", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          wallet: walletAddress,
-          netWorthUsd: netWorth,
-        }),
-      });
+    const res = await fetch('/api/snapshot', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        wallet: addr,
+        netWorthUsd: netWorth,
+      }),
+    });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        console.error("snapshot failed", res.status, errJson);
-      }
-
-      await loadHistory(walletAddress, historyRange);
-    } catch (err) {
-      console.error("refresh failed", err);
-    } finally {
-      setIsRefreshing(false);
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      console.error('snapshot failed', res.status, errJson);
     }
-  };
+
+    await loadHistory(addr, historyRange);
+  } catch (err) {
+    console.error('refresh failed', err);
+  } finally {
+    setIsRefreshing(false);
+  }
+};
+
 
   const changeHistoryRange = (range: HistoryRange) => {
     setHistoryRange(range);
@@ -1241,35 +1243,34 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
               placeholder="Search Address or .INK Domain"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === 'Enter') {
-      const raw = (e.currentTarget as HTMLInputElement).value;
-      const trimmed = raw.trim();
-      if (!trimmed) return;
+onKeyDown={(e) => {
+  if (e.key === 'Enter') {
+    const raw = (e.currentTarget as HTMLInputElement).value;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
 
-      // keep local state in sync
-      setSearchInput(trimmed);
+    setSearchInput(trimmed);
 
-      const sameWallet =
-        walletAddress &&
-        walletAddress.toLowerCase() === trimmed.toLowerCase();
+    const sameWallet =
+      walletAddress &&
+      walletAddress.toLowerCase() === trimmed.toLowerCase();
 
-      if (sameWallet) {
-        // same address - force reload all data
-        setNetWorthHistory([]);
-        setHoverIndex(null);
-        loadPortfolio(trimmed);
-        loadHistory(trimmed, historyRange);
-        loadNfts(trimmed);
-        loadNftSpent(trimmed);
-      } else {
-        // new address - will trigger useEffect
-        setWalletAddress(trimmed);
-        setNetWorthHistory([]);
-        setHoverIndex(null);
-      }
+    setNetWorthHistory([]);
+    setHoverIndex(null);
+
+    if (!sameWallet) {
+      // new wallet - update state so other effects run
+      setWalletAddress(trimmed);
     }
-  }}
+
+    // run full refresh flow for this address
+    refreshAll(trimmed);
+
+    // still reload nfts and spent for this address
+    loadNfts(trimmed);
+    loadNftSpent(trimmed);
+  }
+}}
 />
           </div>
         </div>
@@ -1487,11 +1488,12 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
                     : "enter a wallet to start"}
                 </span>
 
-                <button
-                  className="refresh-round-btn"
-                  onClick={refreshAll}
-                  disabled={isRefreshing || !walletAddress}
-                >
+<button
+  className="refresh-round-btn"
+  onClick={() => refreshAll()}
+  disabled={isRefreshing || !walletAddress}
+>
+
                   <span className={isRefreshing ? "spin-refresh" : ""}>
                     <RefreshIcon />
                   </span>
@@ -2278,7 +2280,7 @@ return groups.map((group) => (
                   rel='noreferrer'
                 >
                   <span className='tx-platform-link-label'>
-                    open app
+                    view protocol
                   </span>
                   <span className='tx-platform-link-icon'>
                     <svg
@@ -2811,7 +2813,7 @@ return groups.map((group) => (
           <span className="col-a">Date / Hash</span>
           <span className="col-b">Platform</span>
           <span className="col-c">Type</span>
-          <span className="col-d">Fee</span>
+          <span className="col-d">Gas Fee</span>
         </div>
 
         {/* error */}
@@ -2841,6 +2843,10 @@ return groups.map((group) => (
   const isScamTx =
     tx.tokens.length > 0 &&
     tx.tokens.every(t => isSpamSymbol(t.symbol));
+
+  const isFailed =
+    (tx.status || '').toLowerCase() !== 'ok';
+
 
 
   const hasOut = legs.some((l) => l.direction === "out");
@@ -2935,21 +2941,30 @@ return groups.map((group) => (
 
 
 
-return (
-  <div
-    className={`positions-row tx-row ${
-      isSwapLike ? 'swap-row' : ''
-    } ${isScamTx ? 'tx-scam-row' : ''}
-    `}
-    key={tx.hash}
-  >
+  return (
+    <div
+      className={`positions-row tx-row ${
+        isSwapLike ? 'swap-row' : ''
+      } ${isScamTx ? 'tx-scam-row' : ''} ${
+        isFailed ? 'tx-failed' : ''
+      }`}
+      key={tx.hash}
+    >
+
 
 <span className='col-a'>
+  {isFailed && (
+    <div className='tx-status-pill tx-status-pill-failed'>
+      Failed
+    </div>
+  )}
+
   {isScamTx && (
     <div className='tx-scam-tag'>
       Scam tx
     </div>
   )}
+
 
   <div className='tx-date-wrap'>
     <span className='tx-date-main'>

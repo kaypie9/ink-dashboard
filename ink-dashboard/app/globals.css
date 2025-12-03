@@ -3965,7 +3965,7 @@ body[data-theme="light"] .tx-platform-text:hover {
 }
 .tx-platform-link-label {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .tx-platform-link-icon {
@@ -4058,8 +4058,8 @@ body[data-theme="light"] .tx-platform-text:hover {
 
 /* small tweak so protocol name stack feels tighter */
 .yielding-protocol-header .tx-platform-meta .tx-method-text {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 900;
 }
 .yielding-protocol-header .tx-platform-link-label {
   font-size: 12px;
@@ -4212,4 +4212,102 @@ body[data-theme="light"] .tx-platform-text:hover {
   15% { opacity: 1; transform: translateY(0); }
   85% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(-3px); }
+}
+
+/* light THEME positions header row LIQUIDITY POOL */
+body[data-theme='light'] .yielding-kind-row {
+  background-color: #f2f3f5 !important;  /* slightly different grey */
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* DARK THEME positions header row  DEPOSITS / LIQUIDITY POOL */
+body[data-theme='dark'] .yielding-kind-row {
+  background-color: #2a2e3d !important;  /* slightly different grey */
+  color: #9ca3af !important;
+}
+
+
+/* Yielding tab - top header row (Protocol | Pool | Balance | Rewards | Value) */
+body[data-theme='dark'] .yielding-protocol-header {
+  background-color: #1f2430 !important;
+  color: #cbd3e1 !important;
+}
+
+
+
+/* failed transaction styling */
+.tx-failed {
+  opacity: 0.55;
+}
+
+.tx-failed .tx-date-main,
+.tx-failed .tx-date-sub,
+.tx-failed .tx-hash,
+.tx-failed .tx-method-text,
+.tx-failed .tx-platform-text,
+.tx-failed .tx-amount-symbol {
+  color: #9ca3af;
+}
+
+body[data-theme='dark'] .tx-failed .tx-date-main,
+body[data-theme='dark'] .tx-failed .tx-date-sub,
+body[data-theme='dark'] .tx-failed .tx-hash,
+body[data-theme='dark'] .tx-failed .tx-method-text,
+body[data-theme='dark'] .tx-failed .tx-platform-text,
+body[data-theme='dark'] .tx-failed .tx-amount-symbol {
+  color: #6b7280;
+}
+
+/* Failed pill */
+.tx-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.tx-status-pill-failed {
+  background: rgba(248, 113, 113, 0.14);
+  color: #ef4444;
+}
+
+body[data-theme='dark'] .tx-status-pill-failed {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fecaca;
 }
