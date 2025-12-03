@@ -390,7 +390,38 @@ function parseTxDetails(details: string | undefined): TxLeg[] {
 export default function HomePage() {
   const [activePage, setActivePage] = useState<PageKey>("Home");
   const [isPinned, setIsPinned] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+  if (typeof window === 'undefined') return 'light'
+
+  const stored = window.localStorage.getItem('ink-theme')
+  if (stored === 'light' || stored === 'dark') return stored
+
+  return 'light'
+})
+
+// ADD THIS
+const [mounted, setMounted] = useState(false)
+
+useEffect(() => {
+  if (typeof window === 'undefined') return
+
+  const stored = window.localStorage.getItem('ink-theme')
+  if (stored === 'light' || stored === 'dark') {
+    setTheme(stored)
+  }
+
+  setMounted(true) // mark as mounted AFTER we read storage
+}, [])
+
+
+useEffect(() => {
+  if (typeof window === 'undefined') return
+
+  const stored = window.localStorage.getItem('ink-theme')
+  if (stored === 'light' || stored === 'dark') {
+    setTheme(stored)
+  }
+}, [])
 
   // real wallet and search input
   const [walletAddress, setWalletAddress] = useState<string>("");
@@ -891,11 +922,17 @@ const activePoint =
 
 
   // theme to body
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.body.dataset.theme = theme;
-    }
-  }, [theme]);
+useEffect(() => {
+  if (typeof document === 'undefined') return
+
+  document.body.dataset.theme = theme
+
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('ink-theme', theme)
+  }
+}, [theme])
+
+
 
   const toggleTheme = () =>
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
@@ -1276,13 +1313,18 @@ onKeyDown={(e) => {
         </div>
 
         <div className="header-right">
-          <button
-            type="button"
-            className="theme-toggle-btn"
-            onClick={toggleTheme}
-          >
-            {theme === "light" ? "☾" : "☀"}
-          </button>
+<button
+  type="button"
+  className="theme-toggle-btn"
+  onClick={toggleTheme}
+>
+  {!mounted
+    ? '☾'                  // initial SSR + first client render
+    : theme === 'light'
+      ? '☾'
+      : '☀'}
+</button>
+
 
           <button className="connect-wallet-btn">
   connect wallet
@@ -2425,43 +2467,104 @@ return groups.map((group) => (
                   ? findTokenIconBySymbol(rightSym)
                   : null;
 
-                return (
-                  <>
-                    <div className='lp-pair-icons'>
-                      <div className='lp-pair-icon lp-pair-icon-left'>
-                        {leftIcon ? (
-                          <img
-                            src={leftIcon}
-                            className='lp-pair-icon-img'
-                            alt={leftSym || 'token'}
-                          />
-                        ) : (
-                          (leftSym || '?')[0].toUpperCase()
-                        )}
-                      </div>
-                      <div className='lp-pair-icon lp-pair-icon-right'>
-                        {rightIcon ? (
-                          <img
-                            src={rightIcon}
-                            className='lp-pair-icon-img'
-                            alt={rightSym || 'token'}
-                          />
-                        ) : (
-                          (rightSym || '?')[0].toUpperCase()
-                        )}
-                      </div>
-                    </div>
+    const token0Addr = v.lpBreakdown?.token0Address;
+    const token1Addr = v.lpBreakdown?.token1Address;
 
-                    <span
-                      style={{
-                        whiteSpace: 'normal',
-                        overflow: 'visible',
-                      }}
-                    >
-                      {displayLabel}
-                    </span>
-                  </>
-                );
+    const singleTokenAddr =
+      (v.tokenAddress as string) ||
+      (v.poolAddress as string) ||
+      (v.contractAddress as string) ||
+      '';
+
+    // LP pair branch
+    if (token0Addr && token1Addr && leftSym && rightSym) {
+      return (
+        <>
+          <div className="lp-pair-icons">
+            <div className="lp-pair-icon lp-pair-icon-left">
+              {leftIcon ? (
+                <img
+                  src={leftIcon}
+                  className="lp-pair-icon-img"
+                  alt={leftSym || 'token'}
+                />
+              ) : (
+                (leftSym || poolText || '?')[0].toUpperCase()
+              )}
+            </div>
+            <div className="lp-pair-icon lp-pair-icon-right">
+              {rightIcon ? (
+                <img
+                  src={rightIcon}
+                  className="lp-pair-icon-img"
+                  alt={rightSym || 'token'}
+                />
+              ) : (
+                rightSym ? rightSym[0].toUpperCase() : ''
+              )}
+            </div>
+          </div>
+
+          <span
+            style={{
+              whiteSpace: 'normal',
+              overflow: 'visible',
+            }}
+            className="yield-token-pair"
+          >
+            <a
+              className="yield-token-link"
+              href={`https://explorer.inkonchain.com/token/${token0Addr}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {leftSym}
+            </a>
+            <span className="yield-token-plus"> + </span>
+            <a
+              className="yield-token-link"
+              href={`https://explorer.inkonchain.com/token/${token1Addr}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {rightSym}
+            </a>
+          </span>
+        </>
+      );
+    }
+
+    // single asset branch  iETH, ULTRAETH etc
+    return (
+      <div className="pool-asset-row">
+        <a
+          href={
+            singleTokenAddr
+              ? `https://explorer.inkonchain.com/token/${singleTokenAddr}`
+              : '#'
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          className="single-asset-link"
+        >
+          <span className="token-icon">
+            {leftIcon ? (
+              <img
+                src={leftIcon}
+                className="token-icon-img"
+                alt={displayLabel || 'token'}
+              />
+            ) : (
+              (displayLabel || '?')[0].toUpperCase()
+            )}
+          </span>
+
+          <span className="token-symbol">
+            {displayLabel}
+          </span>
+        </a>
+      </div>
+    );
               })()}
             </span>
 
@@ -3284,19 +3387,17 @@ const valueUsd =
         })}
 
 {txHasMore && walletAddress && (
-  <div
-    className='positions-row positions-row-empty'
-    style={{ justifyContent: 'center' }}
-  >
+  <div className="tx-load-more-wrapper">
     <button
-      className='wallet-action-btn'
+      className="tx-load-more-btn"
       onClick={() => setTxPage(p => p + 1)}
       disabled={isLoadingTxs}
     >
-      {isLoadingTxs ? 'loading...' : 'load more'}
+      {isLoadingTxs ? 'loading...' : 'Load More'}
     </button>
   </div>
 )}
+
       </>
     )}
   </div>

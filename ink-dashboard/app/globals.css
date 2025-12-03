@@ -170,6 +170,8 @@ body[data-theme="dark"] .connect-wallet-btn {
   box-shadow:
     0 10px 26px rgba(79, 70, 229, 0.7),
     0 0 0 1px rgba(186, 165, 255, 0.9);
+
+transition: box-shadow .1s ease, transform .1s ease;
 }
 
 .header-right button:hover {
@@ -3089,6 +3091,7 @@ body[data-theme="light"] .header-right button {
   border: 1px solid #d1d5db;
   color: #1f2937; /* clean dark text */
 }
+
 body[data-theme="light"] .header-right button:hover {
   background: #f3f4f6;
 }
@@ -4310,4 +4313,142 @@ body[data-theme='dark'] .tx-failed .tx-amount-symbol {
 body[data-theme='dark'] .tx-status-pill-failed {
   background: rgba(248, 113, 113, 0.18);
   color: #fecaca;
+}
+
+.tx-load-more-btn {
+  padding: 10px 22px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  background: white;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+}
+
+/* purple gradient ring */
+.tx-load-more-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 2px;
+  background: linear-gradient(90deg, #a855f7, #7c3aed, #4f46e5);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+}
+
+.tx-load-more-btn:disabled {
+  opacity: 2;
+  cursor: default;
+}
+
+.tx-load-more-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 24px 0;
+}
+
+.tx-load-more-btn {
+  padding: 12px 28px;
+  font-size: 15px;
+  border-radius: 23px;
+}
+
+
+/* DARK MODE ONLY */
+body[data-theme="dark"] .tx-load-more-btn {
+  background: #0c0f18;                /* same dark card base */
+  border: 1.4px solid rgba(140, 95, 255, 0.35); /* subtle purple border */
+  color: #d5d7e0;                      /* soft text like your cards */
+
+  padding: 12px 32px;
+  font-size: 15px;
+  border-radius: 22px;
+
+  box-shadow:
+    inset 0 0 14px rgba(140, 95, 255, 0.08),    /* inner purple glow */
+    0 0 8px rgba(140, 95, 255, 0.05);           /* soft outer aura */
+}
+
+body[data-theme="dark"] .tx-load-more-btn:hover {
+  border-color: rgba(140, 95, 255, 0.55);
+  box-shadow:
+    inset 0 0 18px rgba(140, 95, 255, 0.15),
+    0 0 10px rgba(140, 95, 255, 0.08);
+  opacity: 1;
+}
+
+/* Light mode: match dark mode connect wallet style */
+body[data-theme='light'] .connect-wallet-btn {
+  background: transparent !important;
+  color: #111 !important;
+
+  border: 1px solid rgba(160, 97, 255, 0.4) !important;
+
+  box-shadow:
+    0 0 0 1px rgba(160, 97, 255, 0.4),
+    0 8px 22px rgba(160, 97, 255, 0.18);
+
+  transition: box-shadow .1s ease, transform .1s ease;
+}
+
+.yield-pool-token-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.yield-token-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.yield-token-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.yield-token-link:hover {
+  text-decoration: underline;
+}
+
+.yield-token-plus {
+  color: inherit;
+  opacity: 0.8;
+}
+.single-asset-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.single-asset-link .token-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.single-asset-link .token-symbol {
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: none; /* remove ALL CAPS */
+}
+
+.single-asset-link {
+  text-transform: none;
+}
+
+.pool-asset-row .token-symbol {
+  text-transform: none;
 }

@@ -179,6 +179,8 @@ type TokenHolding = {
     token1Symbol: string;
     amount0: number;
     amount1: number;
+    token0Address: string;
+    token1Address: string;
   };
 };
 
@@ -197,6 +199,8 @@ type VaultPosition = {
     token1Symbol: string;
     amount0: number;
     amount1: number;
+    token0Address: string;
+    token1Address: string;
   };
   creatorAddress: string | null;
 };
@@ -583,6 +587,8 @@ const [sym0, sym1] = await Promise.all([
         token1Symbol: sym1,
         amount0,
         amount1,
+        token0Address: addr0,
+        token1Address: addr1,
       },
     });
   }
