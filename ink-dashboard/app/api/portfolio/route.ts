@@ -6,41 +6,53 @@ const RPC_URL =
   process.env.NEXT_PUBLIC_INK_RPC || 'https://rpc-gel.inkonchain.com';
 
 const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2';
-const BLOCKSCOUT_RPC_BASE = 'https://explorer.inkonchain.com/api'
 
 
-async function resolveCreatorAddress(pairAddr: string): Promise<string | null> {
-  const factory = await readFactory(pairAddr);
-  if (!factory) return null;
-
-  const owner = await readFactoryOwner(factory);
-  if (owner) return owner;
-
-  return factory; // fallback
-}
-
-
-
-async function readFactory(pairAddr: string): Promise<string | null> {
-  const data = "0xc45a0155"; // keccak256("factory()")
-  const hex = await ethCallRaw(pairAddr, data);
-  const body = hex.replace(/^0x/, "");
-  if (body.length < 64) return null;
-  const addr = "0x" + body.slice(24, 64);
-  return addr.toLowerCase();
-}
-
+// read owner() from any Ownable contract
 async function readFactoryOwner(factoryAddr: string): Promise<string | null> {
-  const data = "0x8da5cb5b"; // owner()
-  const hex = await ethCallRaw(factoryAddr, data);
-  const body = hex.replace(/^0x/, "");
-  if (body.length < 64) return null;
-  const addr = "0x" + body.slice(24, 64);
-  return addr.toLowerCase();
+  try {
+    const data = "0x8da5cb5b"; // owner()
+    const hex = await ethCallRaw(factoryAddr, data);
+    const body = hex.replace(/^0x/, "");
+    if (body.length < 64) return null;
+
+    const addr = "0x" + body.slice(24, 64);
+    return addr.toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
+// read factory() from a UniswapV2 / Solidly / Velodrome style pool
+async function readFactory(pairAddr: string): Promise<string | null> {
+  try {
+    const data = "0xc45a0155"; // factory()
+    const hex = await ethCallRaw(pairAddr, data);
+    const body = hex.replace(/^0x/, "");
+    if (body.length < 64) return null;
 
+    const addr = "0x" + body.slice(24, 64);
+    return addr.toLowerCase();
+  } catch {
+    return null;
+  }
+}
 
+// full logic: pool → factory → owner
+async function resolveCreatorAddress(pairAddr: string): Promise<string | null> {
+  try {
+    const factory = await readFactory(pairAddr);
+    if (!factory) return null;
+
+    const owner = await readFactoryOwner(factory);
+    if (owner) return owner;
+
+    // fallback: factory itself is the creator
+    return factory;
+  } catch {
+    return null;
+  }
+}
 
 const BIGINT_ZERO = BigInt(0);
 
@@ -219,14 +231,19 @@ function guessVaultFromToken(
   const nm = (t.name || '').toUpperCase();
   const combined = `${sym} ${nm}`;
 
-  // liquid staked ETH wrappers on Ink - treat as yielding
-  if (nm.includes('IETH') || sym === 'IET') {
-    return { protocol: 'Onchain', pool: 'iETH' };
-  }
+// Dinero LSTs auto detection
+if (
+  sym.includes('IETH') ||
+  sym === 'IET' ||
+  sym.includes('ULTRA') ||
+  sym.includes('ULT') ||
+  nm.includes('STAKED') ||
+  nm.includes('DINERO')
+) {
+  // use the token's own symbol as pool name
+  return { protocol: 'Dinero', pool: sym };
+}
 
-  if (nm.includes('ULTRAETH') || sym === 'ULT') {
-    return { protocol: 'Onchain', pool: 'ultraETH' };
-  }
 
   // AMM and v2 style LPs - sAMMV2, vAMMV2, UNI-V2 etc
   if (

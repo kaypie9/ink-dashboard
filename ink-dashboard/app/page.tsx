@@ -16,11 +16,23 @@ import {
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 
+import PreloadPlatformIcons from "./PreloadPlatformIcons";
 
-  // ADD MORE for TRANSACTIONS
+
+function getFavicon(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const origin = new URL(url).origin;
+    return `${origin}/favicon.ico`;
+  } catch {
+    return null;
+  }
+}
+
+  // ADD MORE for TRANSACTIONS icons
 const PLATFORM_ICONS: Record<string, string> = {
   // inkypump
-  '0x1d74317d760f2c72a94386f50e8d10f2c902b899': 'inkypump',
+  '0x1d74317d760f2c72a94386f50e8d10f2c902b899': 'Inkyswap',
 
   // across
   '': '',
@@ -38,16 +50,36 @@ const PLATFORM_ICONS: Record<string, string> = {
 
 }
 
-  // ADD MORE for YIELDING
+  // ADD MORE for YIELDING Naming /////// 
   
 const PROTOCOL_LABELS: Record<string, string> = {
-  // Nado pools creator
-  '0x458c5d5b75ccba22651d2c5b61cb1ea1e0b0f95d': 'Superswap',
+  // inkyswap pools creator
+  '0x458c5d5b75ccba22651d2c5b61cb1ea1e0b0f95d': 'Inkyswap',
 
   // Velodrome
   '0x31832f2a97fd20664d76cc421207669b55ce4bc0': 'Velodrome',
 };
 
+
+  // ADD MORE for YIELDING Icons /////// 
+
+const PROTOCOL_ICONS: Record<string, string> = {
+  Dinero: 'dinero',
+  Velodrome: 'velodrome',
+  Inkyswap: 'Inkyswap',
+};
+
+  // ADD MORE for YIELDING Links /////
+
+export const PROTOCOL_URLS: Record<string, string> = {
+  Velodrome: 'https://velodrome.finance',
+  Inkyswap: 'https://inkyswap.com/swap',
+  TEST: 'https://inkonchain.com/staking/iether',
+  TEST2: 'https://inkonchain.com/staking/ultra',
+  TEST3: 'https://inkonchain.com/staking',
+  AMM: 'https://inkonchain.com/swap',
+  Dinero: 'https://ink.dinero.xyz/',   // <= add this
+};
 
 
 
@@ -370,7 +402,8 @@ export default function HomePage() {
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [copied, setCopied] = useState(false);
+const [walletCopied, setWalletCopied] = useState(false);
+const [txCopiedKey, setTxCopiedKey] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
   // icons from Dexscreener keyed by token address
@@ -961,8 +994,114 @@ const yieldingPositions = useMemo(() => {
   return portfolio.vaults || [];
 }, [portfolio]);
 
-console.log('YIELDING POSITIONS', yieldingPositions);
+const yieldingByProtocol = useMemo(() => {
+  if (!portfolio || !yieldingPositions.length) return [];
 
+  type GroupItem = {
+    v: any;
+    positionType: 'Liquidity pool' | 'Staked' | 'Vault' | 'Other';
+  };
+
+  type Group = {
+    key: string;
+    protocolLabel: string;
+    protocolUrl: string | null;
+    creatorAddr: string | null;
+    finalIconSrc: string;
+    items: GroupItem[];
+  };
+
+  const groupsByKey: Record<string, Group> = {};
+
+  for (const v of yieldingPositions as any[]) {
+    const platform = v.protocol || 'unknown';
+
+    const creatorAddr = ((v.creatorAddress as string) || '').toLowerCase();
+    const rawLabel = v.poolName || v.name || v.symbol || '';
+
+    const protoLabel = creatorAddr
+      ? PROTOCOL_LABELS[creatorAddr] || shortAddress(creatorAddr)
+      : platform;
+
+    const upperSym = (v.symbol || '').toUpperCase();
+    const upperPool = (rawLabel || '').toUpperCase();
+
+    let positionType: GroupItem['positionType'] = 'Staked';
+
+    if (
+      v.lpBreakdown ||
+      upperPool.includes('AMMV2') ||
+      upperPool.includes('VAMMV2') ||
+      upperPool.includes('SAMMV2') ||
+      upperPool.includes('UNI-V2') ||
+      upperPool.includes(' LP') ||
+      upperPool.includes(' LIQUIDITY') ||
+      upperPool.includes(' POOL')
+    ) {
+      positionType = 'Liquidity pool';
+    } else if (
+      upperPool.includes('VAULT') ||
+      upperPool.includes('HYDRO') ||
+      upperPool.includes('DCA')
+    ) {
+      positionType = 'Vault';
+    } else if (
+      (upperSym.startsWith('S') && upperSym.includes('STK')) ||
+      upperPool.includes('STAKED')
+    ) {
+      positionType = 'Staked';
+    } else {
+      positionType = 'Other';
+    }
+
+    let protocolUrl = PROTOCOL_URLS[protoLabel] || null;
+    if (!protocolUrl) {
+      protocolUrl = PROTOCOL_URLS[positionType] || null;
+    }
+    const faviconUrl = protocolUrl ? getFavicon(protocolUrl) : null;
+
+    const addrKey = (
+      (v.tokenAddress as string) ||
+      (v.poolAddress as string) ||
+      (v.contractAddress as string) ||
+      ''
+    ).toLowerCase();
+
+    const platformKey =
+      addrKey && PLATFORM_ICONS[addrKey]
+        ? PLATFORM_ICONS[addrKey]
+        : '';
+
+    const manualIconKey =
+      PROTOCOL_ICONS[protoLabel] || platformKey || '';
+
+    const manualIconSrc = manualIconKey
+      ? `/platforms/${manualIconKey}.svg`
+      : null;
+
+    const finalIconSrc =
+      faviconUrl ||
+      manualIconSrc ||
+      '/platforms/dapp.svg';
+
+    const groupKey = protoLabel || platform || 'Unknown';
+
+    if (!groupsByKey[groupKey]) {
+      groupsByKey[groupKey] = {
+        key: groupKey,
+        protocolLabel: protoLabel,
+        protocolUrl,
+        creatorAddr: creatorAddr || null,
+        finalIconSrc,
+        items: [],
+      };
+    }
+
+    groupsByKey[groupKey].items.push({ v, positionType });
+  }
+
+  return Object.values(groupsByKey);
+}, [yieldingPositions, portfolio]);
 
 const explorerTxUrl = walletAddress
   ? `https://explorer.inkonchain.com/address/${walletAddress}?tab=txs`
@@ -1067,6 +1206,7 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
 
   return (
     <>
+        <PreloadPlatformIcons />
       {/* top header */}
       <header
         className={`header ${isPinned ? "header-pinned" : "header-floating"}`}
@@ -1382,24 +1522,25 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
                       <span className="wallet-label">EVM Wallet</span>
                       <span className="wallet-status-pill">Not Connected</span>
                     </div>
-                    <div
-                      className={
-                        "wallet-address-row" + (copied ? " show-tooltip" : "")
-                      }
-                      onClick={async () => {
-                        if (!walletAddress) return;
-                        try {
-                          await navigator.clipboard.writeText(walletAddress);
-                        } catch (e) {
-                          console.error("clipboard failed", e);
-                        }
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1200);
-                      }}
-                    >
-                      {copied && (
-                        <span className="wallet-copy-tooltip">copied</span>
-                      )}
+<div
+  className={
+    'wallet-address-row' + (walletCopied ? ' show-tooltip' : '')
+  }
+  onClick={async () => {
+    if (!walletAddress) return;
+    try {
+      await navigator.clipboard.writeText(walletAddress.toLowerCase());
+    } catch (e) {
+      console.error('clipboard failed', e);
+    }
+    setWalletCopied(true);
+    setTimeout(() => setWalletCopied(false), 1200);
+  }}
+>
+  {walletCopied && (
+    <span className='wallet-copy-tooltip'>copied</span>
+  )}
+
 
                       <span className="wallet-address-text">
 <span className="wallet-address-text">
@@ -1741,10 +1882,12 @@ const showTxFullLoader = isLoadingTxs && txPage === 1;
     </div>
   </div>
 
-  {/* TAB 1: wallet tokens (current table) */}
-{positionsTab === 'wallet' && (
-  <div className='positions-table wallet-table'>
-    {/* table header */}
+{/* TAB 1: wallet tokens (current table) */}
+<div
+  className='positions-table wallet-table'
+  style={{ display: positionsTab === 'wallet' ? 'block' : 'none' }}
+>
+      {/* table header */}
     <div className='positions-row positions-row-head wallet-head'>
       <span className='col-token wallet-head-col'>Token</span>
       <span className='col-price wallet-head-col'>Price</span>
@@ -1849,12 +1992,13 @@ const value = t.valueUsd ?? price * t.balance
           );
         })}
     </div>
-  )}
 
-  {/* TAB 2: yielding pools placeholder */}
-{positionsTab === "yielding" && (
-  <div className="positions-table yielding-table">
-<div className="positions-row positions-row-head yielding-head">
+{/* TAB 2: yielding pools */}
+<div
+  className="positions-table yielding-table"
+  style={{ display: positionsTab === "yielding" ? "block" : "none" }}
+>
+  <div className="positions-row positions-row-head yielding-head">
 
   {/* PROTOCOL */}
 <span className='col-token nft-head-col' style={{ width: '22%' }}>
@@ -1914,225 +2058,466 @@ const value = t.valueUsd ?? price * t.balance
 {!showSkeleton &&
   !portfolioError &&
   portfolio &&
-  yieldingPositions.map((v: any, idx: number) => {
-    const label =
-      v.poolName ||
-      v.name ||
-      v.symbol ||
-      'yield position';
+  (() => {
+    type YieldView = {
+      v: any;
+      positionType: string;
+      depositedUsd: number;
+      amount: number;
+      apr: number;
+      protocolLabel: string;
+      creatorAddr: string;
+      finalIconSrc: string;
+      protocolUrl: string | null;
+      explorerUrl: string | null;
+    };
 
-    const platform = v.protocol || 'unknown';
+const groups: {
+  key: string;
+  protocolLabel: string;
+  kindLabel: string;
+  iconSrc: string;
+  manualIconSrc: string | null;
+  protocolUrl: string | null;
+  explorerUrl: string | null;
+  totalUsd: number;
+  rows: YieldView[];
+}[] = [];
 
-    const depositedUsd =
-      Number(v.depositedUsd ?? v.valueUsd ?? 0);
 
-    const amount = Number(v.amount ?? 0);
 
-    const apr = Number(v.apr ?? v.apy ?? 0);
+    const byKey: Record<string, number> = {};
 
-    // main contract or pool address
-    const rawAddr =
-      (v.tokenAddress as string) ||
-      (v.poolAddress as string) ||
-      (v.contractAddress as string) ||
-      '';
+    yieldingPositions.forEach((v: any) => {
+      const label =
+        v.poolName ||
+        v.name ||
+        v.symbol ||
+        'yield position';
 
-    // creator address from backend (you may have named it slightly differently)
-    const creatorAddr = ((v.creatorAddress as string) || '').toLowerCase();
+      const platform = v.protocol || 'unknown';
 
-    // nice human protocol name, falls back to v.protocol
-const protocolLabel = creatorAddr
-  ? PROTOCOL_LABELS[creatorAddr] || shortAddress(creatorAddr)
-  : platform;
+      const depositedUsd = Number(v.depositedUsd ?? v.valueUsd ?? 0);
+      const amount = Number(v.amount ?? 0);
+      const apr = Number(v.apr ?? v.apy ?? 0);
 
-    const addrKey = rawAddr.toLowerCase();
+      const rawAddr =
+        (v.tokenAddress as string) ||
+        (v.poolAddress as string) ||
+        (v.contractAddress as string) ||
+        '';
 
-    const platformKey =
-      addrKey && PLATFORM_ICONS[addrKey]
-        ? PLATFORM_ICONS[addrKey]
+      const creatorAddr = ((v.creatorAddress as string) || '').toLowerCase();
+
+      const protocolLabel = creatorAddr
+        ? PROTOCOL_LABELS[creatorAddr] || shortAddress(creatorAddr)
+        : platform;
+
+      const upperSym = (v.symbol || '').toUpperCase();
+      const upperPool = (label || '').toUpperCase();
+
+      let positionType = 'Staked';
+
+      if (
+        v.lpBreakdown ||
+        upperPool.includes('AMMV2') ||
+        upperPool.includes('VAMMV2') ||
+        upperPool.includes('SAMMV2') ||
+        upperPool.includes('UNI-V2') ||
+        upperPool.includes(' LP') ||
+        upperPool.includes(' LIQUIDITY') ||
+        upperPool.includes(' POOL')
+      ) {
+        positionType = 'Liquidity pool';
+      } else if (
+        upperPool.includes('VAULT') ||
+        upperPool.includes('HYDRO') ||
+        upperPool.includes('DCA')
+      ) {
+        positionType = 'Vault';
+      } else if (
+        (upperSym.startsWith('S') && upperSym.includes('STK')) ||
+        upperPool.includes('STAKED')
+      ) {
+        positionType = 'Staked';
+      }
+
+      const groupKind =
+        positionType === 'Liquidity pool'
+          ? 'Liquidity pool'
+          : positionType === 'Vault'
+          ? 'Vault'
+          : 'Deposits';
+
+      const addrKey = rawAddr.toLowerCase();
+
+      const platformKey =
+        addrKey && PLATFORM_ICONS[addrKey]
+          ? PLATFORM_ICONS[addrKey]
+          : '';
+
+      let protocolUrl = PROTOCOL_URLS[protocolLabel] || null;
+      if (!protocolUrl) {
+        protocolUrl = PROTOCOL_URLS[positionType] || null;
+      }
+
+      const faviconUrl = protocolUrl ? getFavicon(protocolUrl) : null;
+
+      const manualIconKey =
+        PROTOCOL_ICONS[protocolLabel] || platformKey || '';
+
+      const manualIconSrc = manualIconKey
+        ? `/platforms/${manualIconKey}.svg`
+        : null;
+
+      const finalIconSrc =
+        faviconUrl ||
+        manualIconSrc ||
+        '/platforms/dapp.svg';
+
+      const explorerUrl = creatorAddr
+        ? `https://explorer.inkonchain.com/address/${creatorAddr}`
         : '';
 
-    // link should ideally go to creator page
-    const explorerUrl = creatorAddr
-      ? `https://explorer.inkonchain.com/address/${creatorAddr}`
-      : '';
+      const groupKey = `${protocolLabel}__${groupKind}`;
 
-return (
-  <div className="positions-row yielding-row" key={idx}>
-        {/* PROTOCOL with icon */}
-        <span
-          className="col-token"
-          style={{ width: "22%", display: "flex", alignItems: "center" }}
-        >
-          <div className="tx-big-icon-wrapper" style={{ marginRight: 8 }}>
-            {platformKey ? (
-              <img
-                src={`/platforms/${platformKey}.svg`}
-                alt={platform}
-                className="tx-big-icon"
-              />
-            ) : (
-              <img
-                src="/platforms/contract.svg"
-                alt={platform}
-                className="tx-big-icon"
-              />
-            )}
-          </div>
+      let idx = byKey[groupKey];
+      if (idx === undefined) {
+        idx = groups.length;
+        byKey[groupKey] = idx;
+groups.push({
+  key: groupKey,
+  protocolLabel,
+  kindLabel: groupKind,
+  iconSrc: finalIconSrc,
+  manualIconSrc,
+  protocolUrl,
+  explorerUrl,
+  totalUsd: 0,
+  rows: [],
+});
+      }
 
-<div className='tx-platform-meta'>
-  <div className='tx-method-text'>
-    {protocolLabel}
-  </div>
+      groups[idx].rows.push({
+        v,
+        positionType,
+        depositedUsd,
+        amount,
+        apr,
+        protocolLabel,
+        creatorAddr,
+        finalIconSrc,
+        protocolUrl,
+        explorerUrl,
+      });
 
-  {explorerUrl ? (
-<a
-  href={explorerUrl}
-  className="tx-platform-text"
->
-  {protocolLabel}
-</a>
+      groups[idx].totalUsd += depositedUsd;
+    });
 
-  ) : (
-    <div className='tx-platform-text'>
-      {label}
-    </div>
-  )}
-</div>
-        </span>
+return groups.map((group) => (
+  <div
+    key={group.key}
+    className="yielding-protocol-group yielding-protocol-card"
+  >
 
-        {/* POOL: debank style pair icons + label */}
-        <span
-          className="col-token"
-          style={{
-            width: "30%",
-            minWidth: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-{(() => {
-  const poolText = (v.poolName as string) || label || "";
-  let leftSym = "";
-  let rightSym = "";
+        {/* protocol header row */}
+        <div className='positions-row yielding-protocol-header'>
+          <span
+            className='col-token'
+            style={{
+              width: '22%',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <div className='tx-big-icon-wrapper protocol-icon'>
+<img
+  src={group.iconSrc}
+  alt={group.protocolLabel}
+  className='tx-big-icon'
+  data-manual-src={group.manualIconSrc || ''}
+  onError={(e) => {
+    const img = e.currentTarget as HTMLImageElement;
+    const manual = img.dataset.manualSrc;
 
-  // 1. prefer symbols from lpBreakdown if present
-  if (
-    v.lpBreakdown &&
-    v.lpBreakdown.token0Symbol &&
-    v.lpBreakdown.token1Symbol
-  ) {
-    leftSym = v.lpBreakdown.token0Symbol;
-    rightSym = v.lpBreakdown.token1Symbol;
-  } else {
-    // 2. fallback to parsing from pool name like iETH/WETH
-    const match = poolText.match(/([A-Za-z0-9]+)\/([A-Za-z0-9]+)/);
-    if (match) {
-      leftSym = match[1];
-      rightSym = match[2];
+    // first failure - try your own protocol svg
+    if (manual && !img.dataset.triedManual) {
+      img.dataset.triedManual = '1';
+      img.src = manual;
+      return;
     }
-  }
 
-  const displayLabel =
-    leftSym && rightSym
-      ? `${leftSym}+${rightSym}`
-      : poolText || "LP token";
+    // if protocol svg also fails - final fallback dapp
+    if (!img.dataset.fallbackDone) {
+      img.dataset.fallbackDone = '1';
+      img.src = '/platforms/dapp.svg';
+    }
+  }}
+/>
+              <div
+                className={
+                  group.kindLabel === 'Liquidity pool'
+                    ? 'protocol-badge protocol-badge-lp'
+                    : 'protocol-badge protocol-badge-stake'
+                }
+              >
+                {group.kindLabel === 'Liquidity pool' ? 'LP' : 'S'}
+              </div>
+            </div>
 
-  const leftIcon = leftSym ? findTokenIconBySymbol(leftSym) : null;
-  const rightIcon = rightSym ? findTokenIconBySymbol(rightSym) : null;
+            <div className='tx-platform-meta'>
+              <div className='tx-method-text'>
+                {group.protocolLabel}
+              </div>
 
-  return (
-    <>
-      <div className="lp-pair-icons">
-        <div className="lp-pair-icon lp-pair-icon-left">
-          {leftIcon ? (
-            <img
-              src={leftIcon}
-              className="lp-pair-icon-img"
-              alt={leftSym || "token"}
-            />
-          ) : (
-            (leftSym || "?")[0].toUpperCase()
-          )}
-        </div>
-        <div className="lp-pair-icon lp-pair-icon-right">
-          {rightIcon ? (
-            <img
-              src={rightIcon}
-              className="lp-pair-icon-img"
-              alt={rightSym || "token"}
-            />
-          ) : (
-            (rightSym || "?")[0].toUpperCase()
-          )}
-        </div>
-      </div>
+              {(group.protocolUrl || group.explorerUrl) && (
+                <a
+                  href={group.protocolUrl || group.explorerUrl || '#'}
+                  className='tx-platform-link'
+                  target='_blank'
+                  rel='noreferrer'
+                >
+                  <span className='tx-platform-link-label'>
+                    open app
+                  </span>
+                  <span className='tx-platform-link-icon'>
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      width='11'
+                      height='11'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        d='M14 3h7v7'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth='1.8'
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                      />
+                      <path
+                        d='M10 14l11-11'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth='1.8'
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                      />
+                      <path
+                        d='M5 7v12h12'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth='1.8'
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                      />
+                    </svg>
+                  </span>
+                </a>
+              )}
+            </div>
+          </span>
 
-      <span
-        style={{
-          whiteSpace: "normal",
-          overflow: "visible",
-        }}
-      >
-        {displayLabel}
-      </span>
-    </>
-  );
-})()}
-
-        </span>
-
-
-        {/* BALANCE */}
+          {/* rest of header row empty to keep columns aligned */}
+          <span className='col-token' style={{ width: '30%' }} />
+          <span className='col-amount' style={{ width: '28%' }} />
+          <span className='col-amount' style={{ width: '10%' }} />
 <span
-  className="col-amount"
-  style={{ width: "28%", textAlign: "center" }}
+  className='col-value yielding-protocol-total'
+  style={{ width: '10%', textAlign: 'right' }}
 >
-  {v.lpBreakdown && v.lpBreakdown.amount0 && v.lpBreakdown.amount1 ? (
-    <div className="yielding-balance-lines">
-      <div>
-        {v.lpBreakdown.amount0.toFixed(6)} {v.lpBreakdown.token0Symbol}
-      </div>
-      <div>
-        {v.lpBreakdown.amount1.toFixed(6)} {v.lpBreakdown.token1Symbol}
-      </div>
-    </div>
-  ) : (
-    amount ? amount.toFixed(4) : "-"
-  )}
+  {`$${group.totalUsd.toFixed(2)}`}
+</span>
+        </div>
+
+        {/* tiny label row like DeBank "Liquidity pool" under protocol name */}
+        <div className='positions-row yielding-kind-row'>
+<span
+  className='col-token'
+  style={{
+    width: '22%',
+    paddingLeft: 54,
+    display: 'flex',
+    alignItems: 'center',
+  }}
+>
+  <span
+    style={{
+      fontSize: 10,
+      fontWeight: 600,
+      background: 'var(--ink-badge-bg, rgba(0,0,0,0.06))',
+      padding: '2px 6px',
+      borderRadius: 6,
+      textTransform: 'uppercase',
+      opacity: 0.7,
+      letterSpacing: 0.3,
+    }}
+  >
+    {group.kindLabel}
+  </span>
 </span>
 
+          <span className='col-token' style={{ width: '30%' }} />
+          <span className='col-amount' style={{ width: '28%' }} />
+          <span className='col-amount' style={{ width: '10%' }} />
+          <span className='col-value' style={{ width: '10%' }} />
+        </div>
 
+        {/* real rows for that protocol */}
+        {group.rows.map(({ v, depositedUsd, amount, apr }, idx) => (
+          <div className='positions-row yielding-row' key={group.key + idx}>
+            {/* protocol column now empty to avoid repeating icon */}
+            <span
+              className='col-token'
+              style={{ width: '22%' }}
+            />
 
-        {/* APR */}
-        <span
-          className="col-amount"
-          style={{ width: "15%", textAlign: "center" }}
-        >
-          {apr ? `${apr.toFixed(2)}%` : "-"}
-        </span>
+            {/* POOL column: keep your existing LP pair code */}
+            <span
+              className='col-token'
+              style={{
+                width: '30%',
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              {(() => {
+                const label =
+                  v.poolName ||
+                  v.name ||
+                  v.symbol ||
+                  'yield position';
 
-        {/* VALUE */}
-        <span
-          className="col-value"
-          style={{ width: "15%", textAlign: "right" }}
-        >
-          {`$${depositedUsd.toFixed(2)}`}
-        </span>
+                const poolText = label || '';
+                let leftSym = '';
+                let rightSym = '';
+
+                if (
+                  v.lpBreakdown &&
+                  v.lpBreakdown.token0Symbol &&
+                  v.lpBreakdown.token1Symbol
+                ) {
+                  leftSym = v.lpBreakdown.token0Symbol;
+                  rightSym = v.lpBreakdown.token1Symbol;
+                } else {
+                  const match = poolText.match(
+                    /([A-Za-z0-9]+)\/([A-Za-z0-9]+)/
+                  );
+                  if (match) {
+                    leftSym = match[1];
+                    rightSym = match[2];
+                  }
+                }
+
+                const displayLabel =
+                  leftSym && rightSym
+                    ? `${leftSym}+${rightSym}`
+                    : poolText || 'LP token';
+
+                const leftIcon = leftSym
+                  ? findTokenIconBySymbol(leftSym)
+                  : null;
+                const rightIcon = rightSym
+                  ? findTokenIconBySymbol(rightSym)
+                  : null;
+
+                return (
+                  <>
+                    <div className='lp-pair-icons'>
+                      <div className='lp-pair-icon lp-pair-icon-left'>
+                        {leftIcon ? (
+                          <img
+                            src={leftIcon}
+                            className='lp-pair-icon-img'
+                            alt={leftSym || 'token'}
+                          />
+                        ) : (
+                          (leftSym || '?')[0].toUpperCase()
+                        )}
+                      </div>
+                      <div className='lp-pair-icon lp-pair-icon-right'>
+                        {rightIcon ? (
+                          <img
+                            src={rightIcon}
+                            className='lp-pair-icon-img'
+                            alt={rightSym || 'token'}
+                          />
+                        ) : (
+                          (rightSym || '?')[0].toUpperCase()
+                        )}
+                      </div>
+                    </div>
+
+                    <span
+                      style={{
+                        whiteSpace: 'normal',
+                        overflow: 'visible',
+                      }}
+                    >
+                      {displayLabel}
+                    </span>
+                  </>
+                );
+              })()}
+            </span>
+
+            {/* BALANCE */}
+            <span
+              className='col-amount'
+              style={{ width: '28%', textAlign: 'center' }}
+            >
+              {v.lpBreakdown &&
+              v.lpBreakdown.amount0 &&
+              v.lpBreakdown.amount1 ? (
+                <div className='yielding-balance-lines'>
+                  <div>
+                    {v.lpBreakdown.amount0.toFixed(6)}{' '}
+                    {v.lpBreakdown.token0Symbol}
+                  </div>
+                  <div>
+                    {v.lpBreakdown.amount1.toFixed(6)}{' '}
+                    {v.lpBreakdown.token1Symbol}
+                  </div>
+                </div>
+              ) : amount ? (
+                amount.toFixed(4)
+              ) : (
+                '-'
+              )}
+            </span>
+
+            {/* APR as rewards column */}
+            <span
+              className='col-amount'
+              style={{ width: '10%', textAlign: 'center' }}
+            >
+              {apr ? `${apr.toFixed(2)}%` : '-'}
+            </span>
+
+            {/* VALUE */}
+            <span
+              className='col-value'
+              style={{ width: '10%', textAlign: 'right' }}
+            >
+              {`$${depositedUsd.toFixed(2)}`}
+            </span>
+          </div>
+        ))}
       </div>
-    );
-  })}
+    ));
+  })()}
 
   </div>
-)}
 
 
 
 {/* TAB 3: NFTs */}
-{positionsTab === 'nfts' && (
-  <div className='positions-table nft-table'>
-
+<div
+  className='positions-table nft-table'
+  style={{ display: positionsTab === 'nfts' ? 'block' : 'none' }}
+>
 
     {/* header */}
 <div className='positions-row positions-row-head nft-head'>
@@ -2277,14 +2662,14 @@ return (
 })}
 
   </div>
-)}
 
 
-    {/* TAB 4: transactions */}
-{positionsTab === "transactions" && (
-  <div
-className="positions-table tx-table"
-  >
+
+{/* TAB 4: transactions */}
+<div
+  className="positions-table tx-table"
+  style={{ display: positionsTab === "transactions" ? "block" : "none" }}
+>
 
     {/* filter input */}
     <div
@@ -2604,9 +2989,6 @@ if (platformIcon) {
   iconKey = "";
 }
 
-
-
-
     return (
       <div className="tx-platform-block">
         {/* BIG square icon */}
@@ -2635,23 +3017,36 @@ if (platformIcon) {
           )}
 
           {/* PLATFORM NAME — clickable search */}
-          <div
-            className="tx-platform-text"
-onClick={() => {
-  const addr = (tx.primaryAppAddress || tx.to || '').trim();
-  if (!addr) return;
-  setSearchInput(addr);
-  setWalletAddress(addr);
-  setNetWorthHistory([]);
-  setHoverIndex(null);
-  setTxPage(1);
-}}
-title={tx.primaryAppAddress || tx.to}
+<div className='relative'>
+  <div
+    className='tx-platform-text'
+    onClick={async () => {
+      const raw = (tx.primaryAppAddress || tx.to || '').trim();
+      if (!raw) return;
 
+      const lower = raw.toLowerCase();
 
-          >
-            {contractDisplay}
-          </div>
+      try {
+        await navigator.clipboard.writeText(lower);
+        setTxCopiedKey(lower);
+        setTimeout(() => {
+          setTxCopiedKey(current =>
+            current === lower ? null : current
+          );
+        }, 800);
+      } catch (e) {
+        console.error('copy failed', e);
+      }
+    }}
+    title={(tx.primaryAppAddress || tx.to || '').toLowerCase()}
+  >
+    {contractDisplay}
+
+    {txCopiedKey === (tx.primaryAppAddress || tx.to || '').toLowerCase() && (
+      <div className='copy-popup'>copied</div>
+    )}
+  </div>
+</div>
         </div>
       </div>
     );
@@ -2890,7 +3285,6 @@ const valueUsd =
       </>
     )}
   </div>
-)}
 
 </section>
           </div>

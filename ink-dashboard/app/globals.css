@@ -112,7 +112,7 @@ body {
   height: 44px;
   padding: 10px 14px 10px 40px;
   border-radius: 10px;
-background: #f3f4f6;
+background: #eef1f5;
 border-color: #d1d5db;
   font-size: 16px;
   font-weight: 600;
@@ -123,9 +123,10 @@ border-color: #d1d5db;
 .header-center input::placeholder {
   font-weight: 400;
   letter-spacing: -0.01em;
-  color: #9ca3af;
-  opacity: 0.7;       /* softer */
+  color: #6b7280;
+  opacity: 0.55;
 }
+
 
 .header-right button {
   height: 44px;
@@ -675,8 +676,18 @@ body[data-theme="dark"] .header-right button:hover {
 .yielding-table .yielding-head,
 .yielding-table .yielding-row {
   display: grid;
-  grid-template-columns: 2.4fr 2fr 1.6fr 1.1fr 0.5fr; /* protocol | pool | balance | rewards | value */
-  column-gap: 12px;
+  grid-template-columns: 2.2fr 2.1fr 1.7fr 1.3fr 0.9fr; /* protocol | pool | balance | rewards | value */
+  column-gap: 14px;
+  align-items: center;
+}
+
+/* subtle row separation only inside yielding tab */
+.yielding-table .yielding-row + .yielding-row {
+  border-top: 1px solid rgba(148, 152, 161, 0.08);
+}
+
+body[data-theme="dark"] .yielding-table .yielding-row + .yielding-row {
+  border-top: 1px solid rgba(145, 125, 255, 0.25);
 }
 
 
@@ -851,12 +862,13 @@ body[data-theme="dark"] .positions-tab-btn-active {
 }
 
 .portfolio-value {
-  font-size: 36px;      /* was ~34 */
+  font-size: 40px;
   font-weight: 700;
   color: #0f172a;
   letter-spacing: -0.03em;
-  line-height: 1.5;   /* makes it match the pill height */
+  line-height: 1.5;
 }
+
 
 body[data-theme="dark"] .portfolio-value {
   color: #f1f5f9;
@@ -905,12 +917,13 @@ body[data-theme="dark"] .portfolio-value {
 }
 
 .stat-value {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #0f172a;
   margin-bottom: 4px;
 }
+
 
 .stat-note {
   font-size: 12px;
@@ -1767,69 +1780,6 @@ body[data-theme="dark"] .refresh-btn:hover {
   background: #0f172a;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 .refresh-round-btn {
   width: 34px;
   height: 34px;
@@ -1943,7 +1893,7 @@ body[data-theme="dark"] .refresh-round-btn:hover {
   border-radius: 14px;
   background: linear-gradient(
     to bottom,
-    rgba(34, 197, 94, 0.10),   /* was 0.18 */
+    rgba(34, 197, 94, 0.06),   /* was 0.18 */
     rgba(34, 197, 94, 0)
   );
   pointer-events: none;
@@ -1952,7 +1902,7 @@ body[data-theme="dark"] .refresh-round-btn:hover {
 [data-theme="dark"] .portfolio-chart-bg {
   background: linear-gradient(
     to bottom,
-    rgba(45, 212, 191, 0.14),   /* softer */
+    rgba(45, 212, 191, 0.18),   /* softer */
     rgba(45, 212, 191, 0)
   );
 }
@@ -2037,7 +1987,7 @@ body[data-theme="dark"] .refresh-round-btn:hover {
 [data-theme='dark'] .portfolio-chart-bg {
   background: linear-gradient(
     to bottom,
-    rgba(45, 212, 191, 0.24),
+    rgba(45, 212, 191, 0.18),
     rgba(45, 212, 191, 0)
   );
 }
@@ -3881,6 +3831,7 @@ body[data-theme='dark'] .tx-platform-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .tx-big-icon {
@@ -3999,4 +3950,266 @@ body[data-theme="light"] .tx-platform-text:hover {
   flex-direction: column;
   gap: 2px;
   white-space: nowrap;
+}
+.tx-platform-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tx-platform-tiny-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  opacity: 0.9;
+}
+.tx-platform-link-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tx-platform-link-icon {
+  display: inline-flex;
+  opacity: 0.65;
+  margin-left: 2px;
+  transform: translateY(1px);
+}
+
+.tx-platform-link:hover .tx-platform-link-icon {
+  opacity: 1;
+}
+
+
+
+/* tiny round badge in the corner of the protocol icon */
+.tx-protocol-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #f9fafb;
+  border: 1px solid rgba(15, 23, 42, 0.9);
+}
+
+.badge-lp {
+  background: #0ea5e9;
+}
+
+.badge-stake {
+  background: #22c55e;
+}
+
+.badge-vault {
+  background: #a855f7;
+}
+
+.yielding-protocol-group {
+  margin-bottom: 18px;
+  border-radius: 12px;
+  border: 1px solid var(--ink-border-soft);
+  background: var(--ink-surface-card);
+  overflow: hidden;
+}
+
+.yielding-protocol-header {
+  background: rgba(148, 163, 184, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+
+/* icon wrapper already exists, just ensure it can hold the badge */
+.tx-big-icon-wrapper.protocol-icon {
+  position: relative;
+}
+
+/* Subtitle row: Positions, Liquidity pool, Vault */
+.yielding-kind-row {
+  background: transparent;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  padding-top: 2px;      /* thinner row */
+  padding-bottom: 2px;
+}
+
+
+.yielding-kind-row .col-token {
+  font-size: 11px;      /* less chunky */
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1.1;
+  white-space: nowrap;  /* stop Liquidity pool from breaking */
+}
+
+
+
+/* total value text in header */
+.yielding-protocol-total {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* small tweak so protocol name stack feels tighter */
+.yielding-protocol-header .tx-platform-meta .tx-method-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+.yielding-protocol-header .tx-platform-link-label {
+  font-size: 12px;
+}
+
+.yielding-protocol-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e5e7eb;
+  text-decoration: none;
+}
+
+.yielding-protocol-link:hover {
+  opacity: 0.9;
+}
+
+.yielding-group-tag-row {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+
+.protocol-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: var(--ink-badge-bg, rgba(0,0,0,0.06));
+  color: #475569;
+  font-size: 9px;        /* smaller */
+  font-weight: 600;
+  padding: 2px 4px;      /* thinner */
+  border-radius: 5px;    /* less fat */
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+
+
+.protocol-badge-lp {
+  background: #22c55e;
+}
+
+.protocol-badge-stake {
+  background: #6366f1;
+}
+
+/* yielding protocol card - soft block with top gradient */
+.yielding-protocol-card {
+  position: relative;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding-top: 8px;
+  padding-bottom: 4px;
+  border-radius: 10px;
+  background: var(--ink-yield-card-bg, rgba(148, 163, 184, 0.04));
+  border: 1px solid var(--ink-yield-card-border, rgba(15, 23, 42, 0.06));
+  overflow: hidden;
+}
+
+/* faint gradient bar at the very top inside the card */
+.yielding-protocol-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.9),
+    rgba(56, 189, 248, 0.8),
+    rgba(168, 85, 247, 0.9)
+  );
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* keep header, label row and rows aligned inside the card */
+.yielding-protocol-card .yielding-protocol-header,
+.yielding-protocol-card .yielding-kind-row,
+.yielding-protocol-card .yielding-row {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* soft top border between sub rows only */
+.yielding-protocol-card .yielding-row + .yielding-row {
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+/* YIELDING TABLE HEADER – match wallet / nft style */
+.yielding-table .yielding-head {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+/* keep header labels on one line */
+.yielding-table .yielding-head span {
+  white-space: nowrap;
+}
+
+.tx-protocol-badge,
+.protocol-badge {
+  display: none !important;
+}
+
+
+/* compact size for Platform column in tx table */
+
+
+.tx-table .tx-big-icon {
+  width: 25px;
+  height: 25px;
+  border-radius: 6px;
+}
+
+/* texts under Platform */
+.tx-table .tx-platform-meta {
+  gap: 2px;
+}
+
+.tx-table .tx-method-text {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.tx-table .tx-platform-text {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.copy-popup {
+  position: absolute;
+  top: -18px;
+  right: 0;
+  background: #000000cc;
+  color: white;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  animation: fadeInOut 0.8s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(3px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-3px); }
 }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2'
 
-// known app labels by contract address (ALL LOWERCASE)
+// known app name by contract address (ALL LOWERCASE)
 const KNOWN_APPS: Record<string, string> = {
   // inkyPump
   '0x1d74317d760f2c72a94386f50e8d10f2c902b899': 'InkyPump',
