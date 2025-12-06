@@ -165,6 +165,8 @@ type TokenHolding = {
     token1Symbol: string;
     amount0: number;
     amount1: number;
+    token0IconUrl?: string
+    token1IconUrl?: string
   };
 };
 
@@ -2460,12 +2462,15 @@ return groups.map((group) => (
                     ? `${leftSym}+${rightSym}`
                     : poolText || 'LP token';
 
-                const leftIcon = leftSym
-                  ? findTokenIconBySymbol(leftSym)
-                  : null;
-                const rightIcon = rightSym
-                  ? findTokenIconBySymbol(rightSym)
-                  : null;
+// prefer backend lpBreakdown icons, fall back to symbol lookup
+const leftIcon =
+  v.lpBreakdown?.token0IconUrl ||
+  (leftSym ? findTokenIconBySymbol(leftSym) : null);
+
+const rightIcon =
+  v.lpBreakdown?.token1IconUrl ||
+  (rightSym ? findTokenIconBySymbol(rightSym) : null);
+
 
     const token0Addr = v.lpBreakdown?.token0Address;
     const token1Addr = v.lpBreakdown?.token1Address;

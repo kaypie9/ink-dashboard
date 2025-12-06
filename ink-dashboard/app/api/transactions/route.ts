@@ -24,6 +24,7 @@ const KNOWN_APPS: Record<string, string> = {
 type TxToken = {
   symbol: string
   address: string
+  iconUrl?: string
 }
 
 type TxItem = {
@@ -536,7 +537,7 @@ if (isNft) {
       }
     })
 
-    // build global token index from allTxs
+
     const tokenIndexMap: Record<string, TxToken> = {}
     for (const tx of allTxs) {
       for (const t of tx.tokens) {
@@ -550,10 +551,13 @@ if (isNft) {
         }
       }
     }
-    const allTokens: TxToken[] = Object.values(tokenIndexMap)
 
-    // token filter on full list
-    let filteredTxs = allTxs
+ const baseTokens: TxToken[] = Object.values(tokenIndexMap)
+
+// no icon work here anymore, frontend calls /api/token-icon
+const allTokens: TxToken[] = baseTokens
+
+let filteredTxs = allTxs
 
     if (tokenFilter) {
       const tf = tokenFilter
@@ -598,4 +602,5 @@ if (isNft) {
       nativeUsdPrice: 0,
     })
   }
+  
 }

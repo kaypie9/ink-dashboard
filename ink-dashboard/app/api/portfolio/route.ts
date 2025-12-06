@@ -8,6 +8,55 @@ const RPC_URL =
 const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2';
 
 
+type TokenIconMeta = {
+  iconUrl?: string;
+};
+
+async function getTokenIconMeta(address: string): Promise<TokenIconMeta> {
+  try {
+    if (!address) return {};
+
+    // 1) try explorer /tokens
+    try {
+      const resExplorer = await fetch(`${BLOCKSCOUT_BASE}/tokens/${address}`);
+      if (resExplorer.ok) {
+        const data = await resExplorer.json();
+        const icon = (data as any)?.icon_url;
+        if (typeof icon === 'string' && icon.length > 0) {
+          return { iconUrl: icon };
+        }
+      }
+    } catch (e) {
+      console.error('explorer icon fetch failed', e);
+    }
+
+    // 2) fallback to dexscreener
+    const res = await fetch(
+      `https://api.dexscreener.com/latest/dex/tokens/${address}`,
+      { next: { revalidate: 300 } },
+    );
+
+    if (!res.ok) return {};
+
+    const data = await res.json();
+    const pair = Array.isArray((data as any).pairs)
+      ? (data as any).pairs[0]
+      : undefined;
+    if (!pair) return {};
+
+    const info = pair.info || {};
+    const iconUrl =
+      typeof info.imageUrl === 'string' && info.imageUrl.length > 0
+        ? info.imageUrl
+        : undefined;
+
+    return { iconUrl };
+  } catch (e) {
+    console.error('getTokenIconMeta failed', e);
+    return {};
+  }
+}
+
 // read owner() from any Ownable contract
 async function readFactoryOwner(factoryAddr: string): Promise<string | null> {
   try {
@@ -181,6 +230,8 @@ type TokenHolding = {
     amount1: number;
     token0Address: string;
     token1Address: string;
+    token0IconUrl?: string;
+    token1IconUrl?: string;
   };
 };
 
@@ -201,8 +252,11 @@ type VaultPosition = {
     amount1: number;
     token0Address: string;
     token1Address: string;
+    token0IconUrl?: string;
+    token1IconUrl?: string;
   };
   creatorAddress: string | null;
+  iconUrl?: string;
 };
 
 
@@ -413,10 +467,10 @@ async function getTokenMarketData(address: string): Promise<TokenMarketData> {
       return { priceUsd: 0 };
     }
 
-    const res = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${address}`,
-      { next: { revalidate: 60 } },
-    );
+const res = await fetch(
+  `https://api.dexscreener.com/latest/dex/tokens/${address}`,
+  { next: { revalidate: 300 } }
+)
 
     if (!res.ok) {
       console.error('dexscreener status', res.status);
@@ -570,27 +624,31 @@ if (totalSupply === BIGINT_ZERO) {
     const rawPoolLabel = nameLabel || symbolLabel || 'LP position';
 
 // fetch real token symbols from blockscout
-const [sym0, sym1] = await Promise.all([
+// fetch real token symbols from blockscout + icons
+const [sym0, sym1, iconMeta0, iconMeta1] = await Promise.all([
   fetchTokenSymbol(addr0),
   fetchTokenSymbol(addr1),
+  getTokenIconMeta(addr0),
+  getTokenIconMeta(addr1),
 ]);
 
+const poolLabel = rawPoolLabel || 'LP position';
 
-    const poolLabel = rawPoolLabel || 'LP position';
-
-    out.push({
-      ...t,
-      valueUsd,
-      name: poolLabel,
-      lpBreakdown: {
-        token0Symbol: sym0,
-        token1Symbol: sym1,
-        amount0,
-        amount1,
-        token0Address: addr0,
-        token1Address: addr1,
-      },
-    });
+out.push({
+  ...t,
+  valueUsd,
+  name: poolLabel,
+  lpBreakdown: {
+    token0Symbol: sym0,
+    token1Symbol: sym1,
+    amount0,
+    amount1,
+    token0Address: addr0,
+    token1Address: addr1,
+    token0IconUrl: iconMeta0.iconUrl,
+    token1IconUrl: iconMeta1.iconUrl,
+  },
+});
   }
 
   return out;
@@ -703,6 +761,7 @@ vaults.push({
   rewardsUsd: 0,
   lpBreakdown: t.lpBreakdown,
   creatorAddress: null,
+  iconUrl: t.iconUrl,
 });
       } else {
         spotTokens.push(t);
