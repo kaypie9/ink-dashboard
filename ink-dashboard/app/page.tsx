@@ -230,6 +230,15 @@ type TxItem = {
   primaryAppLabel?: string;
 };
 
+type GmStats = {
+  totalGms: number | null;
+  rank: string | null;
+  streak: number | null;
+  verified: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
 
 
 function isSpamToken(t: TokenHolding): boolean {
@@ -453,7 +462,7 @@ const [connectedWallet, setConnectedWallet] = useState<string | null>(null); // 
 const [walletAddress, setWalletAddress] = useState<string>('');             // currently viewed wallet
 const [searchInput, setSearchInput] = useState<string>('');
 const [isConnectingWallet, setIsConnectingWallet] = useState(false);
-const [walletAvatarUrl, setWalletAvatarUrl] = useState<string | null>(null);
+const [ensName, setEnsName] = useState<string | null>(null);
 
   // portfolio + loading state
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
@@ -504,6 +513,37 @@ const [txTokenDropdownOpen, setTxTokenDropdownOpen] = useState(false);
 const [txTokenOptions, setTxTokenOptions] = useState<TxToken[]>([]);
 
 const [nativeUsdPrice, setNativeUsdPrice] = useState(0);
+
+const [gmStats, setGmStats] = useState<GmStats>({
+  totalGms: null,
+  rank: null,
+  streak: null,
+  verified: false,
+  loading: false,
+  error: null,
+});
+
+const [showQrModal, setShowQrModal] = useState(false);
+
+const LAST_WALLET_KEY = 'inkdash_last_connected_wallet';
+
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+
+  const stored = window.localStorage.getItem(LAST_WALLET_KEY);
+  if (!stored) return;
+
+  const addr = stored.toLowerCase();
+
+  setConnectedWallet(addr);
+  setWalletAddress(addr);
+  setSearchInput(addr);
+
+  // hydrate data for that wallet
+  refreshAll(addr);
+  loadNfts(addr);
+  loadNftSpent(addr);
+}, []);
 
 
 // try to get token icon from backend that proxies Dexscreener
@@ -829,6 +869,82 @@ useEffect(() => {
     loadHistory(walletAddress, historyRange);
   }, [historyRange, walletAddress]);
 
+  // GM metrics from gm.inkonchain.com
+useEffect(() => {
+if (!walletAddress) {
+  setGmStats({
+    totalGms: null,
+    rank: null,
+    streak: null,
+    verified: false,
+    loading: false,
+    error: null,
+  });
+  return;
+}
+
+
+  const addr = walletAddress.toLowerCase();
+
+  const fetchGm = async () => {
+    try {
+      setGmStats(prev => ({
+        ...prev,
+        loading: true,
+        error: null,
+      }));
+
+const res = await fetch(
+  `/api/gm-metrics?wallet=${addr}`
+);
+
+
+      if (!res.ok) {
+        throw new Error(`status ${res.status}`);
+      }
+
+      const json = await res.json();
+      const user = json?.user || {};
+
+      const sent =
+        typeof user.sent === 'number' ? user.sent : null;
+      const rank =
+        typeof user.rank === 'string' ? user.rank : null;
+
+      const streakRaw =
+        typeof user.streakCurrent === 'number'
+          ? user.streakCurrent
+          : typeof user.streak === 'number'
+          ? user.streak
+          : null;
+
+      const verified = !!user.verified;
+
+      setGmStats({
+        totalGms: sent,
+        rank,
+        streak: streakRaw,
+        verified,
+        loading: false,
+        error: null,
+      });
+
+    } catch (err) {
+      console.error("gm fetch failed", err);
+      setGmStats({
+        totalGms: null,
+        rank: null,
+        streak: null,
+        verified: false,
+        loading: false,
+        error: 'gm data unavailable',
+      });
+    }
+  };
+
+  fetchGm();
+}, [walletAddress]);
+
  // connecExtention
 
  const connectExtensionWallet = async () => {
@@ -860,6 +976,10 @@ useEffect(() => {
 
     // save real connected wallet
     setConnectedWallet(addr);
+
+    if (typeof window !== 'undefined') {
+  window.localStorage.setItem(LAST_WALLET_KEY, addr);
+}
 
     // make sure we are on Ink
     const targetChainIdHex = '0xdef1'; // 57073
@@ -914,6 +1034,11 @@ useEffect(() => {
 };
 
 const disconnectWallet = () => {
+
+    if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(LAST_WALLET_KEY);
+  }
+
   setConnectedWallet(null);
   setWalletAddress('');
   setSearchInput('');
@@ -1383,11 +1508,47 @@ useEffect(() => {
 const showTxFullLoader = isLoadingTxs && txPage === 1;
 
 
-  return (
-    <>
-        <PreloadPlatformIcons />
-      {/* top header */}
-      <header
+return (
+  <>
+    {showQrModal && walletAddress && (
+      <div
+        className='qr-overlay'
+        onClick={() => setShowQrModal(false)}
+      >
+        <div
+          className='qr-modal'
+          onClick={e => e.stopPropagation()}
+        >
+          <div className='qr-modal-header'>
+            <button
+              type='button'
+              className='qr-close-btn'
+              onClick={() => setShowQrModal(false)}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className='qr-modal-body'>
+            <img
+              className='qr-image'
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                walletAddress.toLowerCase()
+              )}`}
+              alt='wallet qr'
+            />
+            <div className='qr-address'>
+              {walletAddress.toLowerCase()}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    <PreloadPlatformIcons />
+    {/* top header */}
+    <header
+    
         className={`header ${isPinned ? "header-pinned" : "header-floating"}`}
       >
         <div className="header-left">{pageTitles[activePage]}</div>
@@ -1730,7 +1891,7 @@ onKeyDown={(e) => {
                 <div className="portfolio-meta">
                   <div className="wallet-identity">
                     <div className="wallet-label-row">
-                      <span className="wallet-label">EVM Wallet</span>
+                      <span className="wallet-label">INK Wallet</span>
 <span className="wallet-status-pill">
   {isViewingConnectedWallet
     ? "Connected"
@@ -1785,32 +1946,72 @@ onKeyDown={(e) => {
                       </span>
 
 {walletAddress && (
-  <button
-    type="button"
-    className="wallet-copy-icon-btn"
-    aria-label="Copy address"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+  <div className="wallet-tools">
+    {/* copy button */}
+    <button
+      type="button"
+      className="wallet-copy-icon-btn"
+      aria-label="Copy address"
+      onClick={async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(walletAddress.toLowerCase());
+          setWalletCopied(true);
+          setTimeout(() => setWalletCopied(false), 1200);
+        } catch (err) {
+          console.error("clipboard failed", err);
+        }
+      }}
     >
-      <rect x="9" y="9" width="11" height="11" rx="2" ry="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  </button>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="9" y="9" width="11" height="11" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+    </button>
+
+    {/* qr button */}
+    <button
+      type="button"
+      className="wallet-qr-icon-btn"
+      aria-label="Show QR"
+      onClick={(e) => {
+        e.stopPropagation();
+        setShowQrModal(true);
+      }}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <path d="M14 14h3v3h-3z" />
+        <path d="M19 19h2" />
+      </svg>
+    </button>
+  </div>
 )}
 
                     </div>
-
                   </div>
-
                   <div className="wallet-actions-row">
                     <button className="wallet-action-btn" disabled>
                       send
@@ -1822,6 +2023,44 @@ onKeyDown={(e) => {
                       swap
                     </button>
                   </div>
+
+                  {walletAddress && (
+  <div className="gm-metrics-row">
+    {gmStats.verified && (
+      <div className="gm-badge">
+        <span className="gm-badge-icon">🐙</span>
+        <span className="gm-badge-text">Kraken Verified</span>
+      </div>
+    )}
+
+<div className="gm-metrics-list">
+  <div className="gm-metric">
+    <span className="gm-metric-label">Total GMs</span>
+    <span className="gm-metric-value">
+      {gmStats.totalGms ?? '-'}
+    </span>
+  </div>
+
+  <span className="gm-separator-dot">•</span>
+
+  <div className="gm-metric">
+    <span className="gm-metric-label">Rank</span>
+    <span className="gm-metric-value">
+      {gmStats.rank ?? '-'}
+    </span>
+  </div>
+
+  <span className="gm-separator-dot">•</span>
+
+<div className="gm-metric gm-streak" title={`${gmStats.streak} day streak`}>
+  <span className="gm-metric-label">Streak</span>
+  <span className="gm-metric-value">{gmStats.streak ?? "-"}</span>
+</div>
+</div>
+
+  </div>
+)}
+
                 </div>
 
                 {/* right side: net worth + chart */}
@@ -3579,7 +3818,6 @@ const valueUsd =
     </button>
   </div>
 )}
-
       </>
     )}
   </div>
