@@ -14,66 +14,64 @@ async function getNetWorthUsdForWallet(wallet: string): Promise<number> {
       return 0
     }
 
-    const json: any = await res.json()
-    const raw =
-      json.totalValueUsd ??
-      json.total_value_usd ??
-      0
+    const data = await res.json()
+    const value = data?.totalValueUsd
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
 
-    const value = Number(raw)
-    return Number.isFinite(value) ? value : 0
+    return 0
   } catch (err) {
-    console.error(
-      'worker getNetWorthUsdForWallet error',
-      wallet,
-      err,
-    )
+    console.error('worker getNetWorthUsdForWallet error', err)
     return 0
   }
 }
 
 export async function POST() {
   try {
-    const { data: wallets, error } = await supabaseAdmin
+    const { data: rows, error } = await supabaseAdmin
       .from('tracked_wallets')
       .select('wallet_address')
 
     if (error) {
-      console.error('load tracked wallets error', error)
+      console.error('worker select tracked_wallets error', error)
       return NextResponse.json(
-        { error: 'load tracked wallets failed' },
+        { error: 'db error' },
         { status: 500 },
       )
     }
 
-    if (!wallets || wallets.length === 0) {
+    if (!rows || rows.length === 0) {
       return NextResponse.json({ ok: true, processed: 0 })
     }
 
+    const nowIso = new Date().toISOString()
     let processed = 0
 
-    for (const row of wallets) {
-      const wallet = (row as any).wallet_address as string
+    for (const row of rows) {
+      const wallet = (row as any).wallet_address as string | null
       if (!wallet) continue
 
-      try {
-        const netWorthUsd = await getNetWorthUsdForWallet(wallet)
+      const netWorthUsd = await getNetWorthUsdForWallet(wallet)
 
-        await supabaseAdmin
-          .from('wallet_networth_snapshots')
-          .insert({
-            wallet_address: wallet.toLowerCase(),
-            net_worth_usd: netWorthUsd,
-          })
+      const { error: insertError } = await supabaseAdmin
+        .from('wallet_networth_snapshots')
+        .insert({
+          wallet_address: wallet,
+          net_worth_usd: netWorthUsd,
+          taken_at: nowIso,
+        })
 
-        processed += 1
-      } catch (err) {
+      if (insertError) {
         console.error(
-          'worker snapshot failed for wallet',
+          'worker insert snapshot error',
           wallet,
-          err,
+          insertError,
         )
+        continue
       }
+
+      processed += 1
     }
 
     return NextResponse.json({ ok: true, processed })

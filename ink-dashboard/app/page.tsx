@@ -449,8 +449,11 @@ useEffect(() => {
 }, [])
 
   // real wallet and search input
-  const [walletAddress, setWalletAddress] = useState<string>("");
-  const [searchInput, setSearchInput] = useState<string>("");
+const [connectedWallet, setConnectedWallet] = useState<string | null>(null); // real connected wallet
+const [walletAddress, setWalletAddress] = useState<string>('');             // currently viewed wallet
+const [searchInput, setSearchInput] = useState<string>('');
+const [isConnectingWallet, setIsConnectingWallet] = useState(false);
+const [walletAvatarUrl, setWalletAvatarUrl] = useState<string | null>(null);
 
   // portfolio + loading state
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
@@ -826,6 +829,112 @@ useEffect(() => {
     loadHistory(walletAddress, historyRange);
   }, [historyRange, walletAddress]);
 
+ // connecExtention
+
+ const connectExtensionWallet = async () => {
+  if (typeof window === 'undefined') {
+    alert('Wallet connection only works in a browser');
+    return;
+  }
+
+  const eth = (window as any).ethereum;
+  if (!eth) {
+    alert('No extension wallet detected. Install MetaMask, Rabby, Kraken or similar then try again');
+    return;
+  }
+
+  try {
+    setIsConnectingWallet(true);
+
+    const accounts: string[] = await eth.request({
+      method: 'eth_requestAccounts',
+    });
+
+    const first = accounts && accounts[0];
+    if (!first) {
+      alert('No account returned from wallet');
+      return;
+    }
+
+    const addr = first.toLowerCase();
+
+    // save real connected wallet
+    setConnectedWallet(addr);
+
+    // make sure we are on Ink
+    const targetChainIdHex = '0xdef1'; // 57073
+    try {
+      const currentChainId = await eth.request({ method: 'eth_chainId' });
+      if (currentChainId !== targetChainIdHex) {
+        await eth.request({
+          method: 'wallet_addEthereumChain',
+          params: [
+            {
+              chainId: targetChainIdHex,
+              chainName: 'Ink',
+              rpcUrls: ['https://rpc-gel.inkonchain.com'],
+              blockExplorerUrls: ['https://explorer.inkonchain.com'],
+              nativeCurrency: {
+                name: 'Ether',
+                symbol: 'ETH',
+                decimals: 18,
+              },
+            },
+          ],
+        });
+      }
+    } catch (chainErr) {
+      console.error('failed to ensure Ink network', chainErr);
+    }
+
+    // update UI state
+    setWalletAddress(addr);
+    setSearchInput(addr);
+
+    // register for hourly tracking
+    try {
+      await fetch('/api/tracked-wallet', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ wallet: addr }),
+      });
+    } catch (trackErr) {
+      console.error('tracked-wallet call failed', trackErr);
+    }
+
+    // load portfolio + history right away
+    await refreshAll(addr);
+
+  } catch (err) {
+    console.error('connectExtensionWallet error', err);
+    alert('Wallet connection failed');
+  } finally {
+    setIsConnectingWallet(false);
+  }
+};
+
+const disconnectWallet = () => {
+  setConnectedWallet(null);
+  setWalletAddress('');
+  setSearchInput('');
+  setPortfolio(null);
+
+  setNetWorthHistory([]);
+  setHoverIndex(null);
+
+  setTxs([]);
+  setTxPage(1);
+  setTxHasMore(false);
+  setTxSelectedToken(null);
+  setTxTokenQuery('');
+
+  setNftCollections(null);
+  setPerCollectionSpentUsd({});
+  setTotalNftSpentUsd(0);
+};
+
+
+
   // manual refresh: refresh portfolio, write snapshot, reload history
 const refreshAll = async (addrOverride?: string) => {
   const addr = addrOverride || walletAddress;
@@ -1167,9 +1276,15 @@ const yieldingByProtocol = useMemo(() => {
   return Object.values(groupsByKey);
 }, [yieldingPositions, portfolio]);
 
+const isViewingConnectedWallet =
+  !!connectedWallet &&
+  !!walletAddress &&
+  connectedWallet.toLowerCase() === walletAddress.toLowerCase();
+
 const explorerTxUrl = walletAddress
   ? `https://explorer.inkonchain.com/address/${walletAddress}?tab=txs`
   : null;
+
 
 // all unique tokens from transactions
 
@@ -1351,10 +1466,23 @@ onKeyDown={(e) => {
 </button>
 
 
-          <button className="connect-wallet-btn">
-  connect wallet
-</button>
-
+{connectedWallet ? (
+  <button
+    type='button'
+    className='connect-wallet-btn'
+    onClick={disconnectWallet}
+  >
+    {`${connectedWallet.substring(0, 6)}...${connectedWallet.substring(connectedWallet.length - 4)}`} • disconnect
+  </button>
+) : (
+  <button
+    type='button'
+    className='connect-wallet-btn'
+    onClick={connectExtensionWallet}
+  >
+    {isConnectingWallet ? 'connecting...' : 'connect wallet'}
+  </button>
+)}
         </div>
       </header>
 
@@ -1378,12 +1506,26 @@ onKeyDown={(e) => {
 
           {/* main nav items */}
           <nav className="sidebar-nav">
-            <button
-              className={`sidebar-item ${
-                activePage === "Home" ? "sidebar-item-active" : ""
-              }`}
-              onClick={() => setActivePage("Home")}
-            >
+<button
+  className={`sidebar-item ${
+    activePage === 'Home' ? 'sidebar-item-active' : ''
+  }`}
+  onClick={() => {
+    setActivePage('Home');
+
+    if (connectedWallet && walletAddress.toLowerCase() !== connectedWallet.toLowerCase()) {
+      setWalletAddress(connectedWallet);
+      setSearchInput(connectedWallet);
+
+      setNetWorthHistory([]);
+      setHoverIndex(null);
+
+      refreshAll(connectedWallet);
+      loadNfts(connectedWallet);
+      loadNftSpent(connectedWallet);
+    }
+  }}
+>
               <span className="sidebar-icon-slot">
                 <span className="sidebar-icon">
                   <HomeIcon />
@@ -1589,7 +1731,14 @@ onKeyDown={(e) => {
                   <div className="wallet-identity">
                     <div className="wallet-label-row">
                       <span className="wallet-label">EVM Wallet</span>
-                      <span className="wallet-status-pill">Not Connected</span>
+<span className="wallet-status-pill">
+  {isViewingConnectedWallet
+    ? "Connected"
+    : connectedWallet
+    ? "Watching"
+    : "Not connected"}
+</span>
+
                     </div>
 <div
   className={
@@ -1613,8 +1762,12 @@ onKeyDown={(e) => {
 
                       <span className="wallet-address-text">
 <span className="wallet-address-text">
-  current view wallet:{" "}
-  {walletAddress ? (
+  {walletAddress
+    ? isViewingConnectedWallet
+      ? "your wallet: "
+      : "watching: "
+    : "no wallet selected"}
+  {walletAddress && (
     <>
       {formatAddress(walletAddress)}
       <a
@@ -1626,10 +1779,9 @@ onKeyDown={(e) => {
         🔗
       </a>
     </>
-  ) : (
-    "none selected"
   )}
 </span>
+
                       </span>
 
 {walletAddress && (
@@ -1860,7 +2012,7 @@ onKeyDown={(e) => {
               </div>
 
               <div className="stat-card">
-                <div className="stat-label">yielding</div>
+<div className="stat-label">POSITIONS</div>
                 {showSkeleton ? (
                   <>
                     <div className="skeleton skeleton-lg" />
@@ -1870,7 +2022,7 @@ onKeyDown={(e) => {
                   <>
 <div className="stat-value">{formatUsd(yieldingUsd, 2)}</div>
                     <div className="stat-note">
-                      staked, deposits, positions
+  staked, deposits, LP
                     </div>
                   </>
                 )}
@@ -1923,7 +2075,7 @@ onKeyDown={(e) => {
         }
         onClick={() => setPositionsTab("yielding")}
       >
-        Yielding
+        Positions
       </button>
       <button
         className={
