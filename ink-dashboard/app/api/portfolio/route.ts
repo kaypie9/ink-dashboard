@@ -1,12 +1,16 @@
 // app/api/portfolio/route.ts
 
 import { NextResponse } from 'next/server';
+import { fetchNadoUsdEquity } from '@/lib/nado';
+
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_INK_RPC || 'https://rpc-gel.inkonchain.com';
 
 const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2';
 
+const NADO_MARGIN_CONTRACT =
+  '0x05ec92d78ed421f3d3ada77ffde167106565974e'.toLowerCase();
 
 type TokenIconMeta = {
   iconUrl?: string;
@@ -667,11 +671,13 @@ export async function GET(req: Request) {
       );
     }
 
-const [nativeInk, tokens, ethUsd] = await Promise.all([
+const [nativeInk, tokens, ethUsd, nadoUsd] = await Promise.all([
   getNativeBalance(wallet),
   fetchErc20Tokens(wallet),
   getEthUsdPrice(),
+  fetchNadoUsdEquity(wallet),
 ]);
+
 
 console.log(
   'TOKENS FROM BLOCKSCOUT ===>',
@@ -767,6 +773,21 @@ vaults.push({
         spotTokens.push(t);
       }
     }
+
+    // virtual Nado margin account as a yielding position
+if (nadoUsd && Number.isFinite(nadoUsd) && nadoUsd > 0) {
+  vaults.push({
+    tokenAddress: 'nado-margin',
+    symbol: 'USDT', // Nado margin is USD-denominated
+    protocol: 'Nado',
+    poolName: 'Nado margin account',
+    amount: nadoUsd,       // treat amount = equity in USD terms
+    depositedUsd: nadoUsd, // 1:1 with USD value
+    rewardsUsd: 0,
+    creatorAddress: NADO_MARGIN_CONTRACT,
+    iconUrl: undefined,
+  });
+}
 
     const stablesUsd = spotTokens
       .filter((t) => stableSymbols.has(t.symbol.toUpperCase()))

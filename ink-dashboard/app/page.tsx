@@ -58,7 +58,11 @@ const PROTOCOL_LABELS: Record<string, string> = {
 
   // Velodrome
   '0x31832f2a97fd20664d76cc421207669b55ce4bc0': 'Velodrome',
+
+  // Nado margin account
+  '0x05ec92d78ed421f3d3ada77ffde167106565974e': 'Nado',
 };
+
 
 
   // ADD MORE for YIELDING Icons /////// 
@@ -67,6 +71,8 @@ const PROTOCOL_ICONS: Record<string, string> = {
   Dinero: 'dinero',
   Velodrome: 'velodrome',
   Inkyswap: 'Inkyswap',
+  Nado: 'Nado',
+
 };
 
   // ADD MORE for YIELDING Links /////
@@ -78,7 +84,8 @@ export const PROTOCOL_URLS: Record<string, string> = {
   TEST2: 'https://inkonchain.com/staking/ultra',
   TEST3: 'https://inkonchain.com/staking',
   AMM: 'https://inkonchain.com/swap',
-  Dinero: 'https://ink.dinero.xyz/',   // <= add this
+  Dinero: 'https://ink.dinero.xyz/app',
+  Nado: 'https://app.nado.xyz/',
 };
 
 
@@ -326,6 +333,22 @@ function formatLastUpdated(ts: number | null): string {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+function formatNumber(value: number, decimals: number): string {
+  if (!Number.isFinite(value)) return '0'
+
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value)
+}
+
+function formatUsd(value: number, decimals: number = 2): string {
+  return '$' + formatNumber(value, decimals)
+}
+
+function formatAmount(value: number, decimals: number = 4): string {
+  return formatNumber(value, decimals)
+}
 
 type PortfolioResponse = {
   mock: boolean;
@@ -1714,9 +1737,9 @@ onKeyDown={(e) => {
             <div className="chart-tooltip-row">
               <span className="chart-tooltip-dot-icon" />
               <span className="chart-tooltip-label">Net worth</span>
-              <span className="chart-tooltip-value">
-                {`$${activePoint.v.toFixed(2)}`}
-              </span>
+<span className='chart-tooltip-value'>
+  {formatUsd(activePoint.v, 2)}
+</span>
             </div>
           </div>
         </div>
@@ -1777,9 +1800,9 @@ onKeyDown={(e) => {
                     <div className="portfolio-header-content premium-meta">
                       <div className="premium-main-row">
                         <div className="portfolio-main-left">
-                          <span className="portfolio-value">{`$${currentValue.toFixed(
-                            2
-                          )}`}</span>
+<span className="portfolio-value">
+  {formatUsd(currentValue, 0)}  {/* no decimals like $16,980,892 */}
+</span>
                         </div>
                       </div>
 
@@ -1795,13 +1818,14 @@ onKeyDown={(e) => {
     </span>
 
     {/* dollar change on the right */}
-    <span
-      className={`portfolio-sub-value portfolio-pnl-abs ${
-        changeAbs >= 0 ? "pnl-up" : "pnl-down"
-      }`}
-    >
-      {changeAbs >= 0 ? "+" : "-"}${Math.abs(changeAbs).toFixed(2)}
-    </span>
+<span
+  className={`portfolio-sub-value portfolio-pnl-abs ${
+    changeAbs >= 0 ? 'pnl-up' : 'pnl-down'
+  }`}
+>
+  {changeAbs >= 0 ? '+' : '-'}
+  {formatUsd(Math.abs(changeAbs), 2)}
+</span>
   </div>
 ) : (
   <div className="portfolio-sub-row premium-sub-row">
@@ -1829,9 +1853,7 @@ onKeyDown={(e) => {
                   </>
                 ) : (
                   <>
-                    <div className="stat-value">{`$${walletUsd.toFixed(
-                      2
-                    )}`}</div>
+<div className="stat-value">{formatUsd(walletUsd, 2)}</div>
                     <div className="stat-note">spot assets on ink</div>
                   </>
                 )}
@@ -1846,9 +1868,7 @@ onKeyDown={(e) => {
                   </>
                 ) : (
                   <>
-                    <div className="stat-value">{`$${yieldingUsd.toFixed(
-                      2
-                    )}`}</div>
+<div className="stat-value">{formatUsd(yieldingUsd, 2)}</div>
                     <div className="stat-note">
                       staked, deposits, positions
                     </div>
@@ -2023,17 +2043,19 @@ const value = t.valueUsd ?? price * t.balance
                 </a>
               </span>
 
-              <span className="col-price">
-                {price ? `$${price.toFixed(4)}` : "-"}
-              </span>
+<span className="col-price">
+  {price ? formatUsd(price, 4) : '-'}
+</span>
 
-              <span className="col-amount">
-                {t.balance.toFixed(4)}
-              </span>
 
-              <span className="col-value">
-                {`$${value.toFixed(2)}`}
-              </span>
+<span className="col-amount">
+  {formatAmount(t.balance, 4)}  {/* 14,382,027.2943 style */}
+</span>
+
+
+<span className="col-value">
+  {formatUsd(value, 2)}
+</span>
             </div>
           );
         })}
@@ -2372,7 +2394,7 @@ return groups.map((group) => (
   className='col-value yielding-protocol-total'
   style={{ width: '10%', textAlign: 'right' }}
 >
-  {`$${group.totalUsd.toFixed(2)}`}
+  {formatUsd(group.totalUsd, 2)}
 </span>
         </div>
 
@@ -2564,9 +2586,12 @@ const rightIcon =
             )}
           </span>
 
-          <span className="token-symbol">
-            {displayLabel}
-          </span>
+      <span
+        className="token-symbol"
+        style={{ whiteSpace: 'nowrap' }}
+      >
+        {displayLabel}
+      </span>
         </a>
       </div>
     );
@@ -2608,11 +2633,11 @@ const rightIcon =
 
             {/* VALUE */}
             <span
-              className='col-value'
-              style={{ width: '10%', textAlign: 'right' }}
-            >
-              {`$${depositedUsd.toFixed(2)}`}
-            </span>
+  className='col-value'
+  style={{ width: '10%', textAlign: 'right' }}
+>
+  {formatUsd(depositedUsd, 2)}
+</span>
           </div>
         ))}
       </div>
@@ -2753,7 +2778,7 @@ const rightIcon =
     const key = (col.address || '').toLowerCase()
     const spent = perCollectionSpentUsd[key]
     return spent != null && spent > 0
-      ? `$${spent.toFixed(2)}`
+        ? formatUsd(spent, 2)
       : '-'
   })()}
 </span>
@@ -3232,9 +3257,9 @@ const amountText =
   leg.amount == null
     ? ''
     : isNft
-    ? leg.amount.toFixed(0)    // 1, 2, 3 for NFTs
-    : leg.amount.toFixed(4);   // keep 4 decimals for tokens
-
+    ? formatAmount(leg.amount, 0)   // 1, 2, 3 (no decimals, with commas)
+    : formatAmount(leg.amount, 4);  // 14,382,027.2943 style
+    
 // 2) native coin override: ETH / INK always forced
 if (symbolUpper === 'ETH') {
   const iconSrc = 'https://assets.coingecko.com/coins/images/279/large/ethereum.png';
@@ -3250,8 +3275,8 @@ if (symbolUpper === 'ETH') {
         <img src={iconSrc} alt="ETH" className="tx-amount-icon-img" />
       </div>
       <span className="tx-amount-symbol">
-        {sign} {leg.amount?.toFixed(4)} ETH
-        {valueUsd != null ? ` ($${valueUsd.toFixed(2)})` : ''}
+{sign} {leg.amount != null ? formatAmount(leg.amount, 4) : ''} ETH
+{valueUsd != null ? ` (${formatUsd(valueUsd, 2)})` : ''}
       </span>
     </div>
   );
@@ -3271,8 +3296,8 @@ if (symbolUpper === 'INK') {
         <img src={iconSrc} alt="INK" className="tx-amount-icon-img" />
       </div>
       <span className="tx-amount-symbol">
-        {sign} {leg.amount?.toFixed(4)} INK
-        {valueUsd != null ? ` ($${valueUsd.toFixed(2)})` : ''}
+{sign} {leg.amount != null ? formatAmount(leg.amount, 4) : ''} INK
+{valueUsd != null ? ` (${formatUsd(valueUsd, 2)})` : ''}
       </span>
     </div>
   );
@@ -3367,9 +3392,9 @@ const valueUsd =
                 )}
               </div>
 
-<span className="tx-amount-symbol">
+<span className='tx-amount-symbol'>
   {sign} {amountText} {leg.symbol}
-  {valueUsd != null ? ` ($${valueUsd.toFixed(2)})` : ''}
+  {valueUsd != null ? ` (${formatUsd(valueUsd, 2)})` : ''}
 </span>
             </div>
           );
