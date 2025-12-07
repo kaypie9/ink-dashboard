@@ -29,6 +29,76 @@ function getFavicon(url: string | null): string | null {
   }
 }
 
+const BLOCKSCOUT_BASE = 'https://explorer.inkonchain.com/api/v2';
+
+async function resolveInkDomain(name: string): Promise<string | null> {
+  const query = name.trim().toLowerCase();
+  if (!query.endsWith('.ink')) return null;
+
+  try {
+    const res = await fetch(
+      `${BLOCKSCOUT_BASE}/search?q=${encodeURIComponent(query)}`
+    );
+
+    if (!res.ok) {
+      console.error('ink domain search failed', res.status);
+      return null;
+    }
+
+    const data: any = await res.json();
+
+    let items: any[] = [];
+    if (Array.isArray(data)) {
+      items = data;
+    } else if (Array.isArray(data.items)) {
+      items = data.items;
+    } else if (Array.isArray((data as any).results)) {
+      items = (data as any).results;
+    }
+
+    const pickAddress = (item: any): string | null => {
+      const candidates: string[] = [];
+
+      ['address_hash', 'hash', 'address', 'addressHash', 'addr'].forEach(k => {
+        const v = item?.[k];
+        if (typeof v === 'string') candidates.push(v);
+      });
+
+      Object.values(item || {}).forEach(v => {
+        if (typeof v === 'string') candidates.push(v);
+      });
+
+      for (const v of candidates) {
+        if (v.startsWith('0x') && v.length === 42) {
+          return v.toLowerCase();
+        }
+      }
+      return null;
+    };
+
+    for (const it of items) {
+      const type = String(
+        it.resource_type || it.type || it.kind || ''
+      ).toLowerCase();
+
+      if (!type || type.includes('address') || type.includes('account')) {
+        const addr = pickAddress(it);
+        if (addr) return addr;
+      }
+    }
+
+    for (const it of items) {
+      const addr = pickAddress(it);
+      if (addr) return addr;
+    }
+
+    return null;
+  } catch (e) {
+    console.error('resolveInkDomain crashed', e);
+    return null;
+  }
+}
+
   // ADD MORE for TRANSACTIONS icons
 const PLATFORM_ICONS: Record<string, string> = {
   // inkypump
@@ -463,6 +533,7 @@ const [walletAddress, setWalletAddress] = useState<string>('');             // c
 const [searchInput, setSearchInput] = useState<string>('');
 const [isConnectingWallet, setIsConnectingWallet] = useState(false);
 const [ensName, setEnsName] = useState<string | null>(null);
+const [connectedEnsName, setConnectedEnsName] = useState<string | null>(null);
 
   // portfolio + loading state
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
@@ -944,6 +1015,94 @@ const res = await fetch(
 
   fetchGm();
 }, [walletAddress]);
+
+// fetch .ink name for the current wallet from Blockscout
+useEffect(() => {
+  if (!walletAddress) {
+    setEnsName(null);
+    return;
+  }
+
+  const addr = walletAddress.toLowerCase();
+  let cancelled = false;
+
+  const fetchInkName = async () => {
+    try {
+      const res = await fetch(
+        `https://explorer.inkonchain.com/api/v2/addresses/${addr}`
+      );
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      const nameField =
+        typeof data.ens_domain_name === "string" && data.ens_domain_name.length
+          ? data.ens_domain_name
+          : typeof data.name === "string" && data.name.length
+          ? data.name
+          : null;
+
+      if (!cancelled) {
+        setEnsName(nameField);
+      }
+    } catch {
+      if (!cancelled) {
+        setEnsName(null);
+      }
+    }
+  };
+
+  fetchInkName();
+
+  return () => {
+    cancelled = true;
+  };
+}, [walletAddress]);
+
+// fetch .ink name for the connected wallet (button label)
+useEffect(() => {
+  if (!connectedWallet) {
+    setConnectedEnsName(null);
+    return;
+  }
+
+  const addr = connectedWallet.toLowerCase();
+  let cancelled = false;
+
+  const fetchInkName = async () => {
+    try {
+      const res = await fetch(
+        `https://explorer.inkonchain.com/api/v2/addresses/${addr}`
+      );
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      const nameField =
+        typeof data.ens_domain_name === 'string' && data.ens_domain_name.length
+          ? data.ens_domain_name
+          : typeof data.name === 'string' && data.name.length
+          ? data.name
+          : null;
+
+      if (!cancelled) {
+        setConnectedEnsName(nameField);
+      }
+    } catch {
+      if (!cancelled) {
+        setConnectedEnsName(null);
+      }
+    }
+  };
+
+  fetchInkName();
+
+  return () => {
+    cancelled = true;
+  };
+}, [connectedWallet]);
 
  // connecExtention
 
@@ -1581,33 +1740,48 @@ return (
               placeholder="Search Address or .INK Domain"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-onKeyDown={(e) => {
-  if (e.key === 'Enter') {
-    const raw = (e.currentTarget as HTMLInputElement).value;
-    const trimmed = raw.trim();
-    if (!trimmed) return;
+onKeyDown={async (e) => {
+  if (e.key !== 'Enter') return;
 
-    setSearchInput(trimmed);
+  e.preventDefault();
 
-    const sameWallet =
-      walletAddress &&
-      walletAddress.toLowerCase() === trimmed.toLowerCase();
+  const raw = (e.currentTarget as HTMLInputElement).value;
+  const trimmed = raw.trim();
+  if (!trimmed) return;
 
-    setNetWorthHistory([]);
-    setHoverIndex(null);
+  let targetAddress = trimmed;
 
-    if (!sameWallet) {
-      // new wallet - update state so other effects run
-      setWalletAddress(trimmed);
+  // .ink domain case
+  if (
+    trimmed.toLowerCase().endsWith('.ink') &&
+    !trimmed.toLowerCase().startsWith('0x')
+  ) {
+    const resolved = await resolveInkDomain(trimmed);
+
+    if (!resolved) {
+      alert('could not resolve this .ink domain');
+      return;
     }
 
-    // run full refresh flow for this address
-    refreshAll(trimmed);
-
-    // still reload nfts and spent for this address
-    loadNfts(trimmed);
-    loadNftSpent(trimmed);
+    targetAddress = resolved;
   }
+
+  setSearchInput(trimmed);
+
+  const sameWallet =
+    walletAddress &&
+    walletAddress.toLowerCase() === targetAddress.toLowerCase();
+
+  setNetWorthHistory([]);
+  setHoverIndex(null);
+
+  if (!sameWallet) {
+    setWalletAddress(targetAddress);
+  }
+
+  await refreshAll(targetAddress);
+  loadNfts(targetAddress);
+  loadNftSpent(targetAddress);
 }}
 />
           </div>
@@ -1633,9 +1807,10 @@ onKeyDown={(e) => {
     className='connect-wallet-btn'
     onClick={disconnectWallet}
   >
-    {`${connectedWallet.substring(0, 6)}...${connectedWallet.substring(connectedWallet.length - 4)}`} • disconnect
+    {(connectedEnsName || `${connectedWallet.substring(0, 6)}...${connectedWallet.substring(connectedWallet.length - 4)}`)} • disconnect
   </button>
 ) : (
+
   <button
     type='button'
     className='connect-wallet-btn'
@@ -1930,7 +2105,9 @@ onKeyDown={(e) => {
     : "no wallet selected"}
   {walletAddress && (
     <>
-      {formatAddress(walletAddress)}
+      {ensName
+        ? `${ensName} (${formatAddress(walletAddress)})`
+        : formatAddress(walletAddress)}
       <a
         href={`https://explorer.inkonchain.com/address/${walletAddress}`}
         target="_blank"
@@ -1942,6 +2119,7 @@ onKeyDown={(e) => {
     </>
   )}
 </span>
+
 
                       </span>
 
