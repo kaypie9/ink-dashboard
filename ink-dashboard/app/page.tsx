@@ -930,6 +930,15 @@ useEffect(() => {
 
 
 
+// refresh portfolio once when wallet auto-connects (app reopened)
+useEffect(() => {
+  if (!walletAddress) return;
+
+  // if portfolio is still empty → this is an auto-connection load
+  if (!portfolio) {
+    refreshAll(walletAddress);
+  }
+}, [walletAddress]);
 
 
 
@@ -1067,6 +1076,8 @@ useEffect(() => {
     return;
   }
 
+  
+  
   const addr = connectedWallet.toLowerCase();
   let cancelled = false;
 
